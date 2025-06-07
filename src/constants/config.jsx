@@ -1,6 +1,6 @@
 // src/constants/config.js
 
-export const API_BASE_URL = "http://43.202.54.77:8080";
+export const API_BASE_URL = "";
 
 // --- Admin API Endpoints ---
 // (이전에 제공된 API_ENDPOINTS.ADMIN_... 형태의 엔드포인트들은 여기에 그대로 유지됩니다)
