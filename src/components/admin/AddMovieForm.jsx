@@ -4,7 +4,7 @@ import styled from "styled-components";
 import Input from "../common/Input";
 import Button from "../common/Button";
 import { useData } from "../../contexts/DataContext";
-import { PlusCircle, Trash2 } from "lucide-react"; // For movie casts
+import { PlusCircle, Trash2 } from "lucide-react";
 
 const FormWrapper = styled.form`
   display: flex;
@@ -31,6 +31,7 @@ const Grid = styled.div`
     grid-template-columns: 1fr 1fr;
   }
 `;
+
 const FullWidth = styled.div`
   @media (min-width: ${({ theme }) => theme.breakpoints.md}) {
     grid-column: 1 / -1;
@@ -76,6 +77,7 @@ const MovieCastInputGroup = styled.div`
   border-radius: ${({ theme }) => theme.borderRadius.md};
   background-color: ${({ theme }) => theme.colors.surfaceLight};
 `;
+
 const MovieCastRow = styled.div`
   display: flex;
   gap: ${({ theme }) => theme.spacing[2]};
@@ -84,7 +86,6 @@ const MovieCastRow = styled.div`
 `;
 
 const FileInputWrapper = styled.div`
-  /* Copied from AddActorForm */
   label {
     display: block;
     font-size: ${({ theme }) => theme.fontSizes.sm};
@@ -102,8 +103,8 @@ const FileInputWrapper = styled.div`
     background-color: ${({ theme }) => theme.colors.surfaceLight};
   }
 `;
+
 const ImagePreview = styled.img`
-  /* Copied from AddActorForm */
   max-width: 150px;
   max-height: 225px;
   margin-top: ${({ theme }) => theme.spacing[2]};
@@ -111,9 +112,19 @@ const ImagePreview = styled.img`
   border: 1px solid ${({ theme }) => theme.colors.border};
 `;
 
+const ErrorMessageText = styled.p`
+  color: ${({ theme }) => theme.colors.error};
+  background-color: ${({ theme }) => theme.colors.error + "20"};
+  border: 1px solid ${({ theme }) => theme.colors.error + "50"};
+  padding: ${({ theme }) => theme.spacing[3]};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  font-size: ${({ theme }) => theme.fontSizes.sm};
+  text-align: center;
+`;
+
 const AddMovieForm = ({
   onSubmit,
-  initialMovieData,
+  initialData, // prop 이름을 initialMovieData에서 initialData로 변경
   isLoading: isSubmitting,
   actorsForSelect,
 }) => {
@@ -123,8 +134,8 @@ const AddMovieForm = ({
     distributors: allDistributors,
     isLoadingData: isLoadingGlobal,
   } = useData();
-  // actorsForSelect will be passed from AdminDashboardPage (or its CRUD wrapper)
-  // This form assumes `actorsForSelect` is an array of { actorId, name }
+
+  const isEditMode = !!initialData;
 
   const [formData, setFormData] = useState({
     title: "",
@@ -137,7 +148,6 @@ const AddMovieForm = ({
     movieRatingId: "",
     genreIds: [],
     movieCasts: [{ actorId: "", role: "" }],
-    // posterUrl field is removed, use posterImageFile for new/updated poster
   });
   const [posterImageFile, setPosterImageFile] = useState(null);
   const [currentPosterUrl, setCurrentPosterUrl] = useState("");
@@ -146,27 +156,32 @@ const AddMovieForm = ({
   const fileInputRef = useRef(null);
 
   useEffect(() => {
-    if (initialMovieData) {
+    // prop 이름 변경에 따라 initialData를 사용하도록 수정
+    if (initialData) {
       setFormData({
-        title: initialMovieData.title || "",
-        description: initialMovieData.description || "",
-        duration: initialMovieData.duration?.toString() || "",
-        releaseDate: initialMovieData.releaseDate || "",
-        language: initialMovieData.language || "한국어",
-        director: initialMovieData.director || "",
-        distributorId:
-          initialMovieData.distributor?.distributorId?.toString() || "",
-        movieRatingId: initialMovieData.movieRating?.ratingId?.toString() || "",
-        genreIds: initialMovieData.genres?.map((g) => g.genreId) || [],
-        movieCasts: initialMovieData.movieCasts?.map((mc) => ({
-          actorId: mc.actor.actorId.toString(),
-          role: mc.role,
-        })) || [{ actorId: "", role: "" }],
+        title: initialData.title || "",
+        description: initialData.description || "",
+        duration: initialData.duration?.toString() || "",
+        releaseDate: initialData.releaseDate || "",
+        language: initialData.language || "한국어",
+        director: initialData.director || "",
+        distributorId: initialData.distributor?.distributorId?.toString() || "",
+        movieRatingId: initialData.movieRating?.ratingId?.toString() || "",
+        genreIds: initialData.genres?.map((g) => g.genreId) || [],
+        movieCasts:
+          initialData.movieCasts?.length > 0
+            ? initialData.movieCasts.map((mc) => ({
+                actorId: mc.actor.actorId.toString(),
+                role: mc.role,
+              }))
+            : [{ actorId: "", role: "" }],
       });
-      setCurrentPosterUrl(initialMovieData.posterUrl || "");
-      setPreviewUrl(initialMovieData.posterUrl || "");
-      setPosterImageFile(null);
+      setCurrentPosterUrl(initialData.posterUrl || "");
+      setPreviewUrl(initialData.posterUrl || "");
+      setPosterImageFile(null); // 수정 모드 시작 시에는 파일 선택 초기화
+      if (fileInputRef.current) fileInputRef.current.value = ""; // 파일 선택 input도 초기화
     } else {
+      // 추가 모드일 때 폼 초기화
       setFormData({
         title: "",
         description: "",
@@ -183,7 +198,7 @@ const AddMovieForm = ({
       setPreviewUrl("");
       setPosterImageFile(null);
     }
-  }, [initialMovieData]);
+  }, [initialData]); // 의존성 배열도 initialData로 변경
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -228,73 +243,70 @@ const AddMovieForm = ({
       movieCasts: [...prev.movieCasts, { actorId: "", role: "" }],
     }));
   const removeCastMember = (index) => {
-    if (
-      formData.movieCasts.length <= 1 &&
-      initialMovieData &&
-      initialMovieData.movieCasts?.length === 1
-    ) {
-      /* Allow removing if it's not the only one from initial data */
-    } else if (formData.movieCasts.length <= 1) return;
-
+    if (formData.movieCasts.length <= 1) return;
     const updatedCasts = formData.movieCasts.filter((_, i) => i !== index);
-    setFormData((prev) => ({
-      ...prev,
-      movieCasts:
-        updatedCasts.length > 0 ? updatedCasts : [{ actorId: "", role: "" }],
-    })); // Ensure at least one empty row if all removed
+    setFormData((prev) => ({ ...prev, movieCasts: updatedCasts }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setFormError("");
-    if (
-      !formData.title ||
-      !formData.duration ||
-      !formData.releaseDate ||
-      !formData.distributorId ||
-      !formData.movieRatingId
-    ) {
-      setFormError(
-        "필수 항목 (제목, 상영시간, 개봉일, 배급사, 등급)을 모두 입력해주세요."
-      );
+
+    const requiredFields = {
+      title: "제목",
+      duration: "상영시간",
+      releaseDate: "개봉일",
+      distributorId: "배급사",
+      movieRatingId: "관람 등급",
+    };
+    for (const [field, name] of Object.entries(requiredFields)) {
+      if (!formData[field]) {
+        setFormError(`필수 항목 (${name})을 모두 입력해주세요.`);
+        return;
+      }
+    }
+
+    if (!isEditMode && !posterImageFile) {
+      setFormError("새 영화를 추가하려면 포스터 이미지가 필수입니다.");
       return;
     }
 
     const movieDetails = {
       title: formData.title,
       description: formData.description,
-      duration: parseInt(formData.duration),
+      duration: parseInt(formData.duration, 10),
       releaseDate: formData.releaseDate,
       language: formData.language,
       director: formData.director,
-      distributorId: parseInt(formData.distributorId),
-      movieRatingId: parseInt(formData.movieRatingId),
-      genreIds: formData.genreIds.map((id) => parseInt(id)),
+      distributorId: parseInt(formData.distributorId, 10),
+      movieRatingId: parseInt(formData.movieRatingId, 10),
+      genreIds: formData.genreIds.map((id) => parseInt(id, 10)),
       movieCasts: formData.movieCasts
         .filter((cast) => cast.actorId && cast.role)
-        .map((cast) => ({ actorId: parseInt(cast.actorId), role: cast.role })),
+        .map((cast) => ({
+          actorId: parseInt(cast.actorId, 10),
+          role: cast.role,
+        })),
     };
-
-    const submissionData = new FormData();
-    submissionData.append(
-      "movieDetails",
-      new Blob([JSON.stringify(movieDetails)], { type: "application/json" })
-    );
-
-    let hasNewImage = false;
-    if (posterImageFile) {
-      submissionData.append("posterImage", posterImageFile);
-      hasNewImage = true;
-    }
-    // Note: API for update without image is different from update poster only.
-    // This form will use `create-with-image` or `update-with-image`.
-    // Separate poster update/delete can be handled by a different UI/service call.
+    console.log(movieDetails);
 
     try {
-      // onSubmit prop will call addMovieWithImage or updateMovieWithImage
-      await onSubmit(submissionData, hasNewImage);
-      if (!initialMovieData) {
-        // Reset form only on successful add
+      const hasNewImage = !!posterImageFile;
+
+      if (hasNewImage) {
+        const submissionData = new FormData();
+        submissionData.append(
+          "movieDetails",
+          new Blob([JSON.stringify(movieDetails)], { type: "application/json" })
+        );
+        submissionData.append("posterImage", posterImageFile);
+
+        await onSubmit(submissionData, true);
+      } else {
+        await onSubmit(movieDetails, false);
+      }
+
+      if (!isEditMode) {
         setFormData({
           title: "",
           description: "",
@@ -310,31 +322,30 @@ const AddMovieForm = ({
         setPosterImageFile(null);
         setPreviewUrl("");
         setCurrentPosterUrl("");
-        if (fileInputRef.current) fileInputRef.current.value = "";
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
       }
     } catch (error) {
       console.error("Movie form submission error: ", error);
       setFormError(
-        error.message ||
-          error.details ||
+        error.response?.data?.message ||
+          error.message ||
           "영화 정보 저장 중 오류가 발생했습니다."
       );
     }
   };
 
-  if (
-    isLoadingGlobal &&
-    (!allGenres?.length || !allRatings?.length || !allDistributors?.length)
-  ) {
+  if (isLoadingGlobal) {
     return <p>폼 데이터 로딩 중...</p>;
   }
 
   return (
     <FormWrapper onSubmit={handleSubmit}>
       <FormSectionTitle>
-        {initialMovieData ? "영화 정보 수정" : "새 영화 추가 (이미지 포함)"}
+        {isEditMode ? "영화 정보 수정" : "새 영화 추가"}
       </FormSectionTitle>
-      {formError && <p style={{ color: "red" }}>{formError}</p>}
+      {formError && <ErrorMessageText>{formError}</ErrorMessageText>}
       <Grid>
         <Input
           name="title"
@@ -371,15 +382,12 @@ const AddMovieForm = ({
           value={formData.language}
           onChange={handleChange}
         />
-
         <FileInputWrapper
-          style={{
-            gridColumn: initialMovieData
-              ? "span 1"
-              : "span 2" /* Full width if adding */,
-          }}
+          style={{ gridColumn: isEditMode ? "span 1" : "span 2" }}
         >
-          <label htmlFor="posterImageFile">포스터 이미지 (선택)</label>
+          <label htmlFor="posterImageFile">
+            포스터 이미지 {isEditMode ? "(변경 시에만 선택)" : "(필수)"}
+          </label>
           <input
             type="file"
             id="posterImageFile"
@@ -387,6 +395,7 @@ const AddMovieForm = ({
             accept="image/*"
             onChange={handleFileChange}
             ref={fileInputRef}
+            required={!isEditMode}
           />
           {(previewUrl || currentPosterUrl) && (
             <ImagePreview
@@ -396,7 +405,6 @@ const AddMovieForm = ({
           )}
         </FileInputWrapper>
       </Grid>
-
       <FullWidth>
         <Input
           name="description"
@@ -477,15 +485,12 @@ const AddMovieForm = ({
             <MovieCastRow>
               <Input
                 name="actorId"
-                label={`배우 ID #${index + 1}`}
+                label={`배우 #${index + 1}`}
                 type="select"
                 value={cast.actorId}
                 onChange={(e) => handleCastChange(index, e)}
-                placeholder="배우 ID"
                 style={{ flexGrow: 1 }}
-                required={
-                  index === 0 || cast.role /* Require if role is filled */
-                }
+                required={index === 0 || !!cast.role}
               >
                 <option value="">배우 선택</option>
                 {actorsForSelect?.map((actor) => (
@@ -501,11 +506,9 @@ const AddMovieForm = ({
                 onChange={(e) => handleCastChange(index, e)}
                 placeholder="역할 (예: 마석도)"
                 style={{ flexGrow: 2 }}
-                required={
-                  index === 0 || cast.actorId /* Require if actorId is filled */
-                }
+                required={index === 0 || !!cast.actorId}
               />
-              {formData.movieCasts.length > 0 && (
+              {formData.movieCasts.length > 1 && (
                 <Button
                   type="button"
                   variant="danger"
@@ -538,7 +541,7 @@ const AddMovieForm = ({
       >
         {isSubmitting
           ? "저장 중..."
-          : initialMovieData
+          : isEditMode
           ? "영화 정보 업데이트"
           : "영화 추가하기"}
       </Button>

@@ -20,21 +20,17 @@ const FormSectionTitle = styled.h3`
   border-bottom: 1px solid ${({ theme }) => theme.colors.border};
 `;
 
-const AddGenreForm = ({
-  onSubmit,
-  initialGenreData,
-  isLoading: isSubmitting,
-}) => {
+const AddGenreForm = ({ onSubmit, initialData, isLoading: isSubmitting }) => {
   const [genreName, setGenreName] = useState("");
   const [formError, setFormError] = useState("");
 
   useEffect(() => {
-    if (initialGenreData) {
-      setGenreName(initialGenreData.genreName || "");
+    if (initialData) {
+      setGenreName(initialData.genreName || "");
     } else {
       setGenreName("");
     }
-  }, [initialGenreData]);
+  }, [initialData]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -43,10 +39,10 @@ const AddGenreForm = ({
       setFormError("장르 이름을 입력해주세요.");
       return;
     }
-    const requestData = { genreName: genreName.trim() }; // MovieGenreRequestDto
+    const requestData = { genreName: genreName.trim() };
     try {
       await onSubmit(requestData);
-      if (!initialGenreData) setGenreName("");
+      if (!initialData) setGenreName("");
     } catch (error) {
       setFormError(
         error.message ||
@@ -59,7 +55,7 @@ const AddGenreForm = ({
   return (
     <FormWrapper onSubmit={handleSubmit}>
       <FormSectionTitle>
-        {initialGenreData ? "장르 수정" : "새 장르 추가"}
+        {initialData ? "장르 수정" : "새 장르 추가"}
       </FormSectionTitle>
       {formError && <p style={{ color: "red" }}>{formError}</p>}
       <Input
@@ -67,14 +63,12 @@ const AddGenreForm = ({
         label="장르 이름"
         value={genreName}
         onChange={(e) => setGenreName(e.target.value)}
-        // API 명세에 maxLength가 없으므로 UI에서 제거하거나 유지할 수 있음
-        // maxLength="30"
         required
       />
       <Button type="submit" variant="primary" fullWidth disabled={isSubmitting}>
         {isSubmitting
           ? "저장 중..."
-          : initialGenreData
+          : initialData
           ? "장르 업데이트"
           : "장르 추가하기"}
       </Button>

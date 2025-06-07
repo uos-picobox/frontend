@@ -26,27 +26,28 @@ const FormSectionTitle = styled.h3`
 const PriceSettingForm = ({
   onSubmit,
   screeningRooms,
-  initialPriceData,
+  initialData,
   isLoading: isSubmitting,
 }) => {
   const { ticketTypes, isLoadingData: isLoadingTicketTypes } = useData();
   const [formData, setFormData] = useState({
-    roomId: "", // integer (ID)
-    ticketTypeId: "", // integer (ID)
-    price: "", // integer
+    roomId: "",
+    ticketTypeId: "",
+    price: "",
   });
   const [formError, setFormError] = useState("");
 
   useEffect(() => {
-    // initialPriceData would be PriceSettingResponseDto which has roomId and ticketTypeId
-    if (initialPriceData) {
+    if (initialData) {
       setFormData({
-        roomId: initialPriceData.roomId?.toString() || "",
-        ticketTypeId: initialPriceData.ticketTypeId?.toString() || "",
-        price: initialPriceData.price?.toString() || "",
+        roomId: initialData.roomId?.toString() || "",
+        ticketTypeId: initialData.ticketTypeId?.toString() || "",
+        price: initialData.price?.toString() || "",
       });
+    } else {
+      setFormData({ roomId: "", ticketTypeId: "", price: "" });
     }
-  }, [initialPriceData]);
+  }, [initialData]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -67,7 +68,6 @@ const PriceSettingForm = ({
     }
 
     const requestData = {
-      // PriceSettingRequestDto
       roomId: parseInt(formData.roomId),
       ticketTypeId: parseInt(formData.ticketTypeId),
       price: priceValue,
@@ -75,12 +75,9 @@ const PriceSettingForm = ({
 
     try {
       await onSubmit(requestData);
-      // For price settings, usually you don't "add new" in the same way,
-      // it's more like setting or updating. So, reset might not be needed unless specified.
-      // If this form is for both adding and editing:
-      // if (!initialPriceData) {
-      //   setFormData({ roomId: '', ticketTypeId: '', price: '' });
-      // }
+      if (!initialData) {
+        setFormData({ roomId: "", ticketTypeId: "", price: "" });
+      }
     } catch (error) {
       console.error("Price setting form submission error:", error);
       setFormError(error.message || "가격 설정 저장 중 오류가 발생했습니다.");
@@ -97,7 +94,7 @@ const PriceSettingForm = ({
   return (
     <FormWrapper onSubmit={handleSubmit}>
       <FormSectionTitle>
-        {initialPriceData ? "가격 설정 수정" : "새 가격 설정"}
+        {initialData ? "가격 설정 수정" : "새 가격 설정"}
       </FormSectionTitle>
       {formError && <p style={{ color: "red" }}>{formError}</p>}
       <Input
@@ -107,8 +104,7 @@ const PriceSettingForm = ({
         value={formData.roomId}
         onChange={handleChange}
         required
-        // If editing, you might want to disable this field or handle changes carefully
-        // disabled={!!initialPriceData}
+        disabled={!!initialData} // 수정 시에는 상영관/티켓 종류 변경 불가
       >
         <option value="">상영관을 선택하세요</option>
         {screeningRooms.map((room) => (
@@ -125,7 +121,7 @@ const PriceSettingForm = ({
         value={formData.ticketTypeId}
         onChange={handleChange}
         required
-        // disabled={!!initialPriceData}
+        disabled={!!initialData} // 수정 시에는 상영관/티켓 종류 변경 불가
       >
         <option value="">티켓 종류를 선택하세요</option>
         {ticketTypes.map((tt) => (
@@ -149,7 +145,7 @@ const PriceSettingForm = ({
       <Button type="submit" variant="primary" fullWidth disabled={isSubmitting}>
         {isSubmitting
           ? "저장 중..."
-          : initialPriceData
+          : initialData
           ? "가격 업데이트"
           : "가격 설정하기"}
       </Button>

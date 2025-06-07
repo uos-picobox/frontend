@@ -23,25 +23,27 @@ const FormSectionTitle = styled.h3`
 
 const AddDistributorForm = ({
   onSubmit,
-  initialDistributorData,
+  initialData,
   isLoading: isSubmitting,
 }) => {
   const [formData, setFormData] = useState({
     name: "",
-    address: "", // Optional
-    phone: "", // Optional
+    address: "",
+    phone: "",
   });
   const [formError, setFormError] = useState("");
 
   useEffect(() => {
-    if (initialDistributorData) {
+    if (initialData) {
       setFormData({
-        name: initialDistributorData.name || "",
-        address: initialDistributorData.address || "",
-        phone: initialDistributorData.phone || "",
+        name: initialData.name || "",
+        address: initialData.address || "",
+        phone: initialData.phone || "",
       });
+    } else {
+      setFormData({ name: "", address: "", phone: "" });
     }
-  }, [initialDistributorData]);
+  }, [initialData]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -57,7 +59,6 @@ const AddDistributorForm = ({
     }
 
     const requestData = {
-      // DistributorRequestDto
       name: formData.name,
       address: formData.address || null,
       phone: formData.phone || null,
@@ -65,8 +66,8 @@ const AddDistributorForm = ({
 
     try {
       await onSubmit(requestData);
-      if (!initialDistributorData) {
-        setFormData({ name: "", address: "", phone: "" }); // Reset only on add
+      if (!initialData) {
+        setFormData({ name: "", address: "", phone: "" });
       }
     } catch (error) {
       console.error("Distributor form submission error:", error);
@@ -77,7 +78,7 @@ const AddDistributorForm = ({
   return (
     <FormWrapper onSubmit={handleSubmit}>
       <FormSectionTitle>
-        {initialDistributorData ? "배급사 정보 수정" : "새 배급사 추가"}
+        {initialData ? "배급사 정보 수정" : "새 배급사 추가"}{" "}
       </FormSectionTitle>
       {formError && <p style={{ color: "red" }}>{formError}</p>}
       <Input
@@ -98,7 +99,7 @@ const AddDistributorForm = ({
       <Input
         name="phone"
         label="전화번호 (선택)"
-        type="tel" // Use tel for better mobile experience
+        type="tel"
         value={formData.phone}
         onChange={handleChange}
         maxLength="20"
@@ -107,7 +108,7 @@ const AddDistributorForm = ({
       <Button type="submit" variant="primary" fullWidth disabled={isSubmitting}>
         {isSubmitting
           ? "저장 중..."
-          : initialDistributorData
+          : initialData
           ? "배급사 업데이트"
           : "배급사 추가하기"}
       </Button>

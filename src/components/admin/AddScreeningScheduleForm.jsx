@@ -25,25 +25,23 @@ const AddScreeningScheduleForm = ({
   onSubmit,
   movies,
   screeningRooms,
-  initialScheduleData,
+  initialData,
   isLoading: isSubmitting,
 }) => {
   const [formData, setFormData] = useState({
     movieId: "",
     roomId: "",
-    screeningTime: "", // HTML input type="datetime-local" gives "YYYY-MM-DDTHH:mm"
+    screeningTime: "",
   });
   const [formError, setFormError] = useState("");
 
   useEffect(() => {
-    if (initialScheduleData) {
+    if (initialData) {
       setFormData({
-        movieId: initialScheduleData.movie?.movieId?.toString() || "",
-        roomId: initialScheduleData.screeningRoom?.roomId?.toString() || "",
-        // API expects "YYYY-MM-DD HH:mm", initialScheduleData.screeningTime might be "YYYY-MM-DDTHH:mm:ssZ" or "YYYY-MM-DD HH:mm:ss"
-        // Convert to "YYYY-MM-DDTHH:mm" for datetime-local input
-        screeningTime: initialScheduleData.screeningTime
-          ? new Date(initialScheduleData.screeningTime)
+        movieId: initialData.movie?.movieId?.toString() || "",
+        roomId: initialData.screeningRoom?.roomId?.toString() || "",
+        screeningTime: initialData.screeningTime
+          ? new Date(initialData.screeningTime.replace(" ", "T")) // 공백을 T로 치환하여 Date 객체 안정성 확보
               .toISOString()
               .substring(0, 16)
           : "",
@@ -51,7 +49,7 @@ const AddScreeningScheduleForm = ({
     } else {
       setFormData({ movieId: "", roomId: "", screeningTime: "" });
     }
-  }, [initialScheduleData]);
+  }, [initialData]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -66,19 +64,18 @@ const AddScreeningScheduleForm = ({
       return;
     }
 
-    // Convert "YYYY-MM-DDTHH:mm" from input to "YYYY-MM-DD HH:mm" for API
-    const formattedScreeningTime = formData.screeningTime.replace("T", " ");
+    const formattedScreeningTime =
+      formData.screeningTime.replace("T", " ") + ":00";
 
     const requestData = {
-      // ScreeningRequestDto
       movieId: parseInt(formData.movieId),
       roomId: parseInt(formData.roomId),
       screeningTime: formattedScreeningTime,
     };
 
     try {
-      await onSubmit(requestData); // This is addScreening or updateScreening
-      if (!initialScheduleData) {
+      await onSubmit(requestData);
+      if (!initialData) {
         setFormData({ movieId: "", roomId: "", screeningTime: "" });
       }
     } catch (error) {
@@ -89,7 +86,6 @@ const AddScreeningScheduleForm = ({
     }
   };
 
-  // Ensure movies and screeningRooms props are available
   if (!movies || !screeningRooms) {
     return <p>영화 또는 상영관 정보를 불러오는 중입니다...</p>;
   }
@@ -97,7 +93,7 @@ const AddScreeningScheduleForm = ({
   return (
     <FormWrapper onSubmit={handleSubmit}>
       <FormSectionTitle>
-        {initialScheduleData ? "스케줄 수정" : "새 상영 스케줄 추가"}
+        {initialData ? "스케줄 수정" : "새 상영 스케줄 추가"}
       </FormSectionTitle>
       {formError && <p style={{ color: "red" }}>{formError}</p>}
       <Input
@@ -144,7 +140,7 @@ const AddScreeningScheduleForm = ({
       <Button type="submit" variant="primary" fullWidth disabled={isSubmitting}>
         {isSubmitting
           ? "저장 중..."
-          : initialScheduleData
+          : initialData
           ? "스케줄 업데이트"
           : "스케줄 추가하기"}
       </Button>

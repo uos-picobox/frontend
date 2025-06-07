@@ -48,40 +48,35 @@ const ImagePreview = styled.img`
   border: 1px solid ${({ theme }) => theme.colors.border};
 `;
 
-const AddActorForm = ({
-  onSubmit,
-  initialActorData,
-  isLoading: isSubmitting,
-}) => {
+const AddActorForm = ({ onSubmit, initialData, isLoading: isSubmitting }) => {
   const [formData, setFormData] = useState({
     name: "",
     birthDate: "",
     biography: "",
   });
   const [profileImageFile, setProfileImageFile] = useState(null);
-  const [currentProfileImageUrl, setCurrentProfileImageUrl] = useState(""); // For displaying existing image
+  const [currentProfileImageUrl, setCurrentProfileImageUrl] = useState("");
   const [previewUrl, setPreviewUrl] = useState("");
   const [formError, setFormError] = useState("");
   const fileInputRef = useRef(null);
 
   useEffect(() => {
-    if (initialActorData) {
+    if (initialData) {
       setFormData({
-        name: initialActorData.name || "",
-        birthDate: initialActorData.birthDate || "",
-        biography: initialActorData.biography || "",
+        name: initialData.name || "",
+        birthDate: initialData.birthDate || "",
+        biography: initialData.biography || "",
       });
-      setCurrentProfileImageUrl(initialActorData.profileImageUrl || "");
-      setPreviewUrl(initialActorData.profileImageUrl || ""); // Show existing image initially
-      setProfileImageFile(null); // Reset file input on new initial data
+      setCurrentProfileImageUrl(initialData.profileImageUrl || "");
+      setPreviewUrl(initialData.profileImageUrl || "");
+      setProfileImageFile(null);
     } else {
-      // Reset for add mode
       setFormData({ name: "", birthDate: "", biography: "" });
       setCurrentProfileImageUrl("");
       setPreviewUrl("");
       setProfileImageFile(null);
     }
-  }, [initialActorData]);
+  }, [initialData]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -97,10 +92,10 @@ const AddActorForm = ({
         setPreviewUrl(reader.result);
       };
       reader.readAsDataURL(file);
-      setCurrentProfileImageUrl(""); // Clear current image URL if new file is selected
+      setCurrentProfileImageUrl("");
     } else {
       setProfileImageFile(null);
-      setPreviewUrl(currentProfileImageUrl); // Revert to existing image if file selection is cleared
+      setPreviewUrl(currentProfileImageUrl);
     }
   };
 
@@ -112,91 +107,53 @@ const AddActorForm = ({
       return;
     }
 
-    // ActorRequestDto for JSON part
     const actorDetails = {
       name: formData.name,
       birthDate: formData.birthDate || null,
       biography: formData.biography || null,
     };
 
-    // FormData for multipart request
-    const submissionData = new FormData();
-    submissionData.append(
-      "actorDetails",
-      new Blob([JSON.stringify(actorDetails)], { type: "application/json" })
-    );
+    const hasNewImage = !!profileImageFile;
 
-    let hasNewImage = false;
-    if (profileImageFile) {
+    if (hasNewImage) {
+      const submissionData = new FormData();
+      submissionData.append(
+        "actorDetails",
+        new Blob([JSON.stringify(actorDetails)], { type: "application/json" })
+      );
       submissionData.append("profileImage", profileImageFile);
-      hasNewImage = true;
-    } else if (initialActorData && !currentProfileImageUrl && !previewUrl) {
-      // This means user wants to remove image. API "/profile-image PUT" with no file handles this.
-      // For create/update-with-image, if no file is sent, it means no change or no new image.
-      // If API expects explicit null for deletion via these endpoints, adjust.
-      // The specific API "/{actorId}/profile-image" is for setting/deleting image *only*.
-      // For create/update with image, not sending a file usually means "don't change image" or "no initial image".
-      // Let's assume if profileImageFile is null, no new image is sent.
+      await onSubmit(submissionData, true);
+    } else {
+      await onSubmit(actorDetails, false);
     }
 
-    try {
-      // onSubmit from AdminDashboardPage will call the appropriate service (addActorWithImage or updateActorWithImage)
-      // The service function itself should handle if it's an add or update.
-      // The `onSubmit` prop needs to accept FormData.
-      await onSubmit(submissionData, hasNewImage); // Pass FormData and flag indicating if image is part of it
-
-      if (!initialActorData) {
-        // Reset form only on successful add
-        setFormData({ name: "", birthDate: "", biography: "" });
-        setProfileImageFile(null);
-        setPreviewUrl("");
-        setCurrentProfileImageUrl("");
-        if (fileInputRef.current) fileInputRef.current.value = "";
-      }
-    } catch (error) {
-      console.error("Actor form submission error:", error);
-      setFormError(
-        error.message ||
-          error.details ||
-          "배우 정보 저장 중 오류가 발생했습니다."
-      );
+    if (!initialData) {
+      setFormData({ name: "", birthDate: "", biography: "" });
+      setProfileImageFile(null);
+      setPreviewUrl("");
+      setCurrentProfileImageUrl("");
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
-  const handleRemoveImage = async () => {
-    // This would typically call the dedicated API to remove an image for an existing actor
-    if (initialActorData?.actorId && currentProfileImageUrl) {
-      if (window.confirm("정말로 프로필 이미지를 삭제하시겠습니까?")) {
-        try {
-          // Call service actorService.setActorProfileImage(initialActorData.actorId, null);
-          // This form's onSubmit might not be the place for this specific action
-          // For simplicity, we'll just clear the preview and file for now,
-          // actual deletion via API can be a separate button/logic if `updateActorWithImage` doesn't handle null image for delete.
-          alert(
-            "이미지 삭제는 /api/admin/actors/{actorId}/profile-image PUT (파일 없음) API를 통해 처리됩니다. 이 폼은 생성/수정 시 이미지 포함 여부를 다룹니다."
-          );
-          setProfileImageFile(null);
-          setPreviewUrl("");
-          setCurrentProfileImageUrl("");
-          if (fileInputRef.current) fileInputRef.current.value = "";
-        } catch (error) {
-          setFormError("이미지 삭제 중 오류: " + error.message);
-        }
-      }
-    } else if (profileImageFile) {
-      // If it's a newly selected file not yet saved
+  const handleRemoveImage = () => {
+    if (profileImageFile) {
       setProfileImageFile(null);
-      setPreviewUrl("");
+      setPreviewUrl(initialData?.profileImageUrl || "");
       if (fileInputRef.current) fileInputRef.current.value = "";
+    } else if (currentProfileImageUrl) {
+      alert(
+        "이미지 삭제는 별도의 API 호출이 필요할 수 있습니다. 현재는 미리보기만 제거됩니다."
+      );
+      setCurrentProfileImageUrl("");
+      setPreviewUrl("");
     }
   };
 
   return (
     <FormWrapper onSubmit={handleSubmit}>
       <FormSectionTitle>
-        {initialActorData
-          ? "배우 정보 수정"
-          : "새 배우 추가 (이미지 포함 가능)"}
+        {initialData ? "배우 정보 수정" : "새 배우 추가"}
       </FormSectionTitle>
       {formError && <p style={{ color: "red" }}>{formError}</p>}
       <Input
@@ -253,7 +210,7 @@ const AddActorForm = ({
       <Button type="submit" variant="primary" fullWidth disabled={isSubmitting}>
         {isSubmitting
           ? "저장 중..."
-          : initialActorData
+          : initialData
           ? "배우 정보 업데이트"
           : "배우 추가하기"}
       </Button>

@@ -23,23 +23,25 @@ const FormSectionTitle = styled.h3`
 
 const AddTicketTypeForm = ({
   onSubmit,
-  initialTicketTypeData,
+  initialData,
   isLoading: isSubmitting,
 }) => {
   const [formData, setFormData] = useState({
     typeName: "",
-    description: "", // Optional
+    description: "",
   });
   const [formError, setFormError] = useState("");
 
   useEffect(() => {
-    if (initialTicketTypeData) {
+    if (initialData) {
       setFormData({
-        typeName: initialTicketTypeData.typeName || "",
-        description: initialTicketTypeData.description || "",
+        typeName: initialData.typeName || "",
+        description: initialData.description || "",
       });
+    } else {
+      setFormData({ typeName: "", description: "" });
     }
-  }, [initialTicketTypeData]);
+  }, [initialData]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -55,15 +57,14 @@ const AddTicketTypeForm = ({
     }
 
     const requestData = {
-      // TicketTypeRequestDto
       typeName: formData.typeName,
       description: formData.description || null,
     };
 
     try {
       await onSubmit(requestData);
-      if (!initialTicketTypeData) {
-        setFormData({ typeName: "", description: "" }); // Reset only on add
+      if (!initialData) {
+        setFormData({ typeName: "", description: "" });
       }
     } catch (error) {
       console.error("Ticket type form submission error:", error);
@@ -74,7 +75,7 @@ const AddTicketTypeForm = ({
   return (
     <FormWrapper onSubmit={handleSubmit}>
       <FormSectionTitle>
-        {initialTicketTypeData ? "티켓 종류 수정" : "새 티켓 종류 추가"}
+        {initialData ? "티켓 종류 수정" : "새 티켓 종류 추가"}
       </FormSectionTitle>
       {formError && <p style={{ color: "red" }}>{formError}</p>}
       <Input
@@ -98,7 +99,7 @@ const AddTicketTypeForm = ({
       <Button type="submit" variant="primary" fullWidth disabled={isSubmitting}>
         {isSubmitting
           ? "저장 중..."
-          : initialTicketTypeData
+          : initialData
           ? "티켓 종류 업데이트"
           : "티켓 종류 추가하기"}
       </Button>

@@ -43,7 +43,7 @@ const RowDefinitionItem = styled.div`
 
 const AddScreeningRoomForm = ({
   onSubmit,
-  initialRoomData,
+  initialData,
   isLoading: isSubmitting,
 }) => {
   const [roomName, setRoomName] = useState("");
@@ -53,11 +53,10 @@ const AddScreeningRoomForm = ({
   const [formError, setFormError] = useState("");
 
   useEffect(() => {
-    if (initialRoomData) {
-      setRoomName(initialRoomData.roomName || "");
-      // API 응답의 seatLayout (ScreeningRoomResponseDto)을 rowDefinitions (ScreeningRoomRequestDto) 형식으로 변환
+    if (initialData) {
+      setRoomName(initialData.roomName || "");
       const initialRowDefs =
-        initialRoomData.seatLayout || initialRoomData.rowDefinitions;
+        initialData.seatLayout || initialData.rowDefinitions;
       setRowDefinitions(
         initialRowDefs && initialRowDefs.length > 0
           ? initialRowDefs
@@ -67,14 +66,13 @@ const AddScreeningRoomForm = ({
       setRoomName("");
       setRowDefinitions([{ rowIdentifier: "A", numberOfSeats: 10 }]);
     }
-  }, [initialRoomData]);
+  }, [initialData]);
 
   const handleRowDefChange = (index, field, value) => {
     const updatedRowDefs = [...rowDefinitions];
     if (field === "numberOfSeats") {
       updatedRowDefs[index][field] = parseInt(value, 10) || 0;
     } else {
-      // rowIdentifier는 대문자 한 글자로 제한하는 것이 일반적이나, API 명세에 따름
       updatedRowDefs[index][field] = value.toUpperCase().trim();
     }
     setRowDefinitions(updatedRowDefs);
@@ -125,7 +123,6 @@ const AddScreeningRoomForm = ({
       );
       return;
     }
-    // Check for duplicate row identifiers
     const identifiers = rowDefinitions.map((def) => def.rowIdentifier.trim());
     if (new Set(identifiers).size !== identifiers.length) {
       setFormError(
@@ -135,7 +132,6 @@ const AddScreeningRoomForm = ({
     }
 
     const requestData = {
-      // ScreeningRoomRequestDto
       roomName: roomName.trim(),
       rowDefinitions: rowDefinitions.map((def) => ({
         rowIdentifier: def.rowIdentifier.trim(),
@@ -144,8 +140,8 @@ const AddScreeningRoomForm = ({
     };
 
     try {
-      await onSubmit(requestData); // This is addScreeningRoom or updateScreeningRoom
-      if (!initialRoomData) {
+      await onSubmit(requestData);
+      if (!initialData) {
         setRoomName("");
         setRowDefinitions([{ rowIdentifier: "A", numberOfSeats: 10 }]);
       }
@@ -160,7 +156,7 @@ const AddScreeningRoomForm = ({
   return (
     <FormWrapper onSubmit={handleSubmit}>
       <FormSectionTitle>
-        {initialRoomData ? "상영관 정보 수정" : "새 상영관 추가"}
+        {initialData ? "상영관 정보 수정" : "새 상영관 추가"}
       </FormSectionTitle>
       {formError && <p style={{ color: "red" }}>{formError}</p>}
       <Input
@@ -192,7 +188,7 @@ const AddScreeningRoomForm = ({
                 onChange={(e) =>
                   handleRowDefChange(index, "rowIdentifier", e.target.value)
                 }
-                maxLength="1" // API 명세에 따르면 한 글자 (A, B 등)
+                maxLength="1"
                 placeholder="예: A"
                 style={{ textTransform: "uppercase", width: "120px" }}
                 required
@@ -208,7 +204,7 @@ const AddScreeningRoomForm = ({
                 style={{ width: "120px" }}
                 required
               />
-              {rowDefinitions.length > 0 && ( // Always show delete if more than 0, but disable if only one
+              {rowDefinitions.length > 0 && (
                 <Button
                   type="button"
                   variant="danger"
@@ -237,7 +233,7 @@ const AddScreeningRoomForm = ({
       <Button type="submit" variant="primary" fullWidth disabled={isSubmitting}>
         {isSubmitting
           ? "저장 중..."
-          : initialRoomData
+          : initialData
           ? "상영관 정보 업데이트"
           : "상영관 추가하기"}
       </Button>

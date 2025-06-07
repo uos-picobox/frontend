@@ -21,25 +21,23 @@ const FormSectionTitle = styled.h3`
   border-bottom: 1px solid ${({ theme }) => theme.colors.border};
 `;
 
-const AddRatingForm = ({
-  onSubmit,
-  initialRatingData,
-  isLoading: isSubmitting,
-}) => {
+const AddRatingForm = ({ onSubmit, initialData, isLoading: isSubmitting }) => {
   const [formData, setFormData] = useState({
     ratingName: "",
-    description: "", // Optional
+    description: "",
   });
   const [formError, setFormError] = useState("");
 
   useEffect(() => {
-    if (initialRatingData) {
+    if (initialData) {
       setFormData({
-        ratingName: initialRatingData.ratingName || "",
-        description: initialRatingData.description || "",
+        ratingName: initialData.ratingName || "",
+        description: initialData.description || "",
       });
+    } else {
+      setFormData({ ratingName: "", description: "" });
     }
-  }, [initialRatingData]);
+  }, [initialData]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -55,15 +53,14 @@ const AddRatingForm = ({
     }
 
     const requestData = {
-      // MovieRatingRequestDto
       ratingName: formData.ratingName,
       description: formData.description || null,
     };
 
     try {
       await onSubmit(requestData);
-      if (!initialRatingData) {
-        setFormData({ ratingName: "", description: "" }); // Reset only on add
+      if (!initialData) {
+        setFormData({ ratingName: "", description: "" });
       }
     } catch (error) {
       console.error("Rating form submission error:", error);
@@ -74,7 +71,7 @@ const AddRatingForm = ({
   return (
     <FormWrapper onSubmit={handleSubmit}>
       <FormSectionTitle>
-        {initialRatingData ? "관람 등급 수정" : "새 관람 등급 추가"}
+        {initialData ? "관람 등급 수정" : "새 관람 등급 추가"}
       </FormSectionTitle>
       {formError && <p style={{ color: "red" }}>{formError}</p>}
       <Input
@@ -96,7 +93,7 @@ const AddRatingForm = ({
       <Button type="submit" variant="primary" fullWidth disabled={isSubmitting}>
         {isSubmitting
           ? "저장 중..."
-          : initialRatingData
+          : initialData
           ? "등급 업데이트"
           : "등급 추가하기"}
       </Button>
