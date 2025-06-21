@@ -2,6 +2,7 @@
 import React from "react";
 import styled from "styled-components";
 import { PLACEHOLDER_POSTER_URL } from "../../constants/config"; // For fallback image
+import { formatDate } from "../../utils/dateUtils"; // 날짜 포맷팅 함수 임포트
 
 const CardWrapper = styled.div`
   background-color: ${({ theme }) => theme.colors.surface};
@@ -14,6 +15,8 @@ const CardWrapper = styled.div`
   display: flex;
   flex-direction: column;
   transition: all 0.3s ease-out;
+  opacity: ${({ isUpcoming }) => (isUpcoming ? 0.8 : 1)};
+  
   &:hover {
     transform: translateY(-${({ theme }) => theme.spacing[1]});
     box-shadow: 0 8px 16px ${({ theme }) => theme.colors.primary + "40"};
@@ -33,6 +36,19 @@ const PosterImageContainer = styled.div`
     object-fit: cover;
     display: block;
   }
+`;
+
+const UpcomingBadge = styled.div`
+  position: absolute;
+  top: ${({ theme }) => theme.spacing[2]};
+  left: ${({ theme }) => theme.spacing[2]};
+  background-color: ${({ theme }) => theme.colors.primary};
+  color: ${({ theme }) => theme.colors.white};
+  padding: ${({ theme }) => theme.spacing[1]} ${({ theme }) => theme.spacing[2]};
+  border-radius: ${({ theme }) => theme.borderRadius.sm};
+  font-size: ${({ theme }) => theme.fontSizes.xs};
+  font-weight: 600;
+  z-index: 2;
 `;
 
 const HoverOverlay = styled.div`
@@ -59,7 +75,8 @@ const HoverOverlay = styled.div`
 const BookButtonSmall = styled.button`
   // Renamed to avoid conflict with common/Button
   font-size: ${({ theme }) => theme.fontSizes.xs};
-  background-color: ${({ theme }) => theme.colors.primary};
+  background-color: ${({ theme, isUpcoming }) =>
+    isUpcoming ? theme.colors.textLighter : theme.colors.primary};
   color: ${({ theme }) => theme.colors.white};
   padding: ${({ theme }) => theme.spacing[1.5]}
     ${({ theme }) => theme.spacing[2]};
@@ -68,9 +85,11 @@ const BookButtonSmall = styled.button`
   width: 100%;
   font-weight: 500;
   transition: background-color ${({ theme }) => theme.transitions.short};
+  cursor: ${({ isUpcoming }) => (isUpcoming ? "default" : "pointer")};
 
   &:hover {
-    background-color: ${({ theme }) => theme.colors.primaryHover};
+    background-color: ${({ theme, isUpcoming }) =>
+      isUpcoming ? theme.colors.textLighter : theme.colors.primaryHover};
   }
 `;
 
@@ -102,14 +121,27 @@ const Details = styled.div`
   margin-top: ${({ theme }) => theme.spacing[2]};
 `;
 
+const ReleaseDate = styled.div`
+  font-size: ${({ theme }) => theme.fontSizes.xs};
+  color: ${({ theme }) => theme.colors.primary};
+  font-weight: 500;
+  margin-top: ${({ theme }) => theme.spacing[1]};
+`;
+
 /**
  * MovieCard Component
  * @param {object} props
  * @param {MovieResponseDto} props.movie - The movie data.
  * @param {function} props.onMovieSelect - Function to call when card is clicked.
  * @param {boolean} props.showBookingButton - Whether to show booking button text.
+ * @param {boolean} props.isUpcoming - Whether the movie is upcoming (release date in future).
  */
-const MovieCard = ({ movie, onMovieSelect, showBookingButton = false }) => {
+const MovieCard = ({
+  movie,
+  onMovieSelect,
+  showBookingButton = false,
+  isUpcoming = false,
+}) => {
   if (!movie) return null;
 
   // MovieResponseDto has movieRating.ratingName and voteAverage (if available from API)
@@ -130,18 +162,33 @@ const MovieCard = ({ movie, onMovieSelect, showBookingButton = false }) => {
   };
 
   const handleCardClick = (e) => {
+    // 개봉예정 영화는 예매를 막습니다
+    if (isUpcoming && showBookingButton) {
+      return;
+    }
+
     // Check if the click target is the button itself or its child
     if (e.target.closest("button")) {
       e.stopPropagation(); // Prevent card click if button is clicked
-      onMovieSelect(movie, showBookingButton); // Pass showBookingButton flag indicating booking intent
+      if (!isUpcoming) {
+        onMovieSelect(movie, showBookingButton); // Pass showBookingButton flag indicating booking intent
+      }
     } else {
-      onMovieSelect(movie, showBookingButton);
+      onMovieSelect(movie, false); // 상세보기는 개봉예정 영화도 가능
     }
   };
 
+  const getButtonText = () => {
+    if (isUpcoming) {
+      return showBookingButton ? "예매 불가" : "상세보기";
+    }
+    return showBookingButton ? "예매하기" : "상세/예매";
+  };
+
   return (
-    <CardWrapper onClick={handleCardClick}>
+    <CardWrapper onClick={handleCardClick} isUpcoming={isUpcoming}>
       <PosterImageContainer>
+        {isUpcoming && <UpcomingBadge>개봉예정</UpcomingBadge>}
         <img
           src={
             movie.posterUrl ||
@@ -152,14 +199,23 @@ const MovieCard = ({ movie, onMovieSelect, showBookingButton = false }) => {
           loading="lazy"
         />
         <HoverOverlay>
-          <BookButtonSmall>
-            {showBookingButton ? "예매하기" : "상세/예매"}
+          <BookButtonSmall isUpcoming={isUpcoming}>
+            {getButtonText()}
           </BookButtonSmall>
         </HoverOverlay>
       </PosterImageContainer>
       <InfoSection>
         <div>
           <Title title={movie.title}>{movie.title}</Title>
+          {isUpcoming && movie.releaseDate && (
+            <ReleaseDate>
+              개봉일:{" "}
+              {formatDate(movie.releaseDate, {
+                month: "short",
+                day: "numeric",
+              })}
+            </ReleaseDate>
+          )}
         </div>
         <Details>
           <span>⭐ {displayRating}</span>

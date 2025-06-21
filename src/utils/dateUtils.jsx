@@ -93,3 +93,54 @@ export const extractTime = (dateTimeString) => {
 export const getTodayDateString = () => {
   return new Date().toISOString().split("T")[0];
 };
+
+/**
+ * Check if a movie is upcoming based on its release date.
+ * @param {string} releaseDate - Release date in YYYY-MM-DD format
+ * @returns {boolean} true if the movie is upcoming (release date is in the future)
+ */
+export const isUpcomingMovie = (releaseDate) => {
+  if (!releaseDate) return false;
+
+  const today = new Date();
+  const release = new Date(releaseDate);
+
+  // Reset time to 00:00:00 for accurate date comparison
+  today.setHours(0, 0, 0, 0);
+  release.setHours(0, 0, 0, 0);
+
+  return release > today;
+};
+
+/**
+ * Check if a movie is currently showing (release date is today or in the past).
+ * @param {string} releaseDate - Release date in YYYY-MM-DD format
+ * @returns {boolean} true if the movie is currently showing
+ */
+export const isCurrentlyShowing = (releaseDate) => {
+  if (!releaseDate) return true; // If no release date, assume it's showing
+
+  return !isUpcomingMovie(releaseDate);
+};
+
+/**
+ * Separate movies into currently showing and upcoming based on release date.
+ * @param {Array} movies - Array of movie objects with releaseDate property
+ * @returns {Object} Object with currentlyShowing and upcoming arrays
+ */
+export const separateMoviesByStatus = (movies) => {
+  if (!Array.isArray(movies)) return { currentlyShowing: [], upcoming: [] };
+
+  const currentlyShowing = [];
+  const upcoming = [];
+
+  movies.forEach((movie) => {
+    if (isUpcomingMovie(movie.releaseDate)) {
+      upcoming.push(movie);
+    } else {
+      currentlyShowing.push(movie);
+    }
+  });
+
+  return { currentlyShowing, upcoming };
+};
