@@ -14,6 +14,7 @@ const HomePageWrapper = styled.div`
   max-width: ${({ theme }) => theme.breakpoints.xl};
   margin-left: auto;
   margin-right: auto;
+  padding-top: ${({ theme }) => theme.spacing[6]};
 `;
 
 const Section = styled.section``;
@@ -108,7 +109,6 @@ const HomePage = () => {
   const [allMovies, setAllMovies] = useState([]);
   const [currentlyShowing, setCurrentlyShowing] = useState([]);
   const [upcomingMovies, setUpcomingMovies] = useState([]);
-  const [featuredMovie, setFeaturedMovie] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
@@ -127,9 +127,6 @@ const HomePage = () => {
             separateMoviesByStatus(moviesData);
           setCurrentlyShowing(showing);
           setUpcomingMovies(upcoming);
-
-          // 피처드 영화는 현재 상영중인 영화 중 첫 번째 또는 전체 영화 중 첫 번째
-          setFeaturedMovie(showing.length > 0 ? showing[0] : moviesData[0]);
         } else {
           setAllMovies([]);
           setCurrentlyShowing([]);
@@ -190,10 +187,10 @@ const HomePage = () => {
 
   return (
     <HomePageWrapper>
-      {featuredMovie && (
+      {currentlyShowing.length > 0 && (
         <Section>
           <FeaturedMovie
-            movie={featuredMovie}
+            movies={currentlyShowing}
             onMovieSelect={handleMovieSelect}
           />
         </Section>

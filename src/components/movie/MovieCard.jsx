@@ -148,9 +148,7 @@ const MovieCard = ({
   const displayRating = movie.voteAverage
     ? (movie.voteAverage / 2).toFixed(1)
     : parseFloat(movie.ratingFallback || "0").toFixed(1); // Example if API has voteAverage out of 10
-  const ageRatingDisplay =
-    movie.movieRating?.ratingName?.replace(" 관람가", "").substring(0, 3) ||
-    "전체";
+  const ageRatingDisplay = movie.movieRatingName || "전체";
 
   const handleImageError = (e) => {
     e.target.src = PLACEHOLDER_POSTER_URL(

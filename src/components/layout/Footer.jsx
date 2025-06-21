@@ -7,7 +7,8 @@ const FooterWrapper = styled.footer`
     theme.colors.surfaceDarker}; /* bg-gray-950 */
   border-top: 1px solid ${({ theme }) => theme.colors.border + "80"}; /* border-gray-700/50 */
   color: ${({ theme }) => theme.colors.textLighter};
-  padding: ${({ theme }) => theme.spacing[12]} 0; /* py-8 md:py-12 */
+  padding: ${({ theme }) => theme.spacing[12]} 0;
+  padding-bottom: ${({ theme }) => theme.spacing[4]};
   font-size: ${({ theme }) => theme.fontSizes.sm};
   text-align: center; /* Default to center for bottom text */
 `;
@@ -64,7 +65,7 @@ const FooterLink = styled.a`
   text-decoration: none;
   &:hover {
     color: ${({ theme }) => theme.colors.primaryLight};
-    text-decoration: underline;
+    text-decoration: none;
   }
 `;
 
@@ -91,7 +92,7 @@ const Footer = () => {
           <FooterSection>
             <SectionTitle>고객센터</SectionTitle>
             <p>1588-XXXX (오전 9시 ~ 오후 6시)</p>
-            <p>picobox_support@email.com</p>
+            <p>uospicobox@gmail.com</p>
           </FooterSection>
           <FooterSection>
             <SectionTitle>바로가기</SectionTitle>
@@ -115,8 +116,7 @@ const Footer = () => {
           <p>
             &copy; {new Date().getFullYear()} PICOBOX Inc. All rights reserved.
           </p>
-          <p>주소: 서울특별시 가나다구 라마바동 123-45 PICOBOX 타워</p>
-          <p>대표이사: 홍길동 | 사업자등록번호: 123-45-67890</p>
+          <p>주소: 서울특별시 동대문구 서울시립대로 163</p>
         </CopyrightSection>
       </FooterContainer>
     </FooterWrapper>
