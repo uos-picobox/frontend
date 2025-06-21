@@ -142,6 +142,7 @@ const AddMovieForm = ({
     description: "",
     duration: "",
     releaseDate: "",
+    screeningEndDate: "",
     language: "한국어",
     director: "",
     distributorId: "",
@@ -163,6 +164,7 @@ const AddMovieForm = ({
         description: initialData.description || "",
         duration: initialData.duration?.toString() || "",
         releaseDate: initialData.releaseDate || "",
+        screeningEndDate: initialData.screeningEndDate || "",
         language: initialData.language || "한국어",
         director: initialData.director || "",
         distributorId: initialData.distributor?.distributorId?.toString() || "",
@@ -187,6 +189,7 @@ const AddMovieForm = ({
         description: "",
         duration: "",
         releaseDate: "",
+        screeningEndDate: "",
         language: "한국어",
         director: "",
         distributorId: "",
@@ -276,6 +279,7 @@ const AddMovieForm = ({
       description: formData.description,
       duration: parseInt(formData.duration, 10),
       releaseDate: formData.releaseDate,
+      screeningEndDate: formData.screeningEndDate,
       language: formData.language,
       director: formData.director,
       distributorId: parseInt(formData.distributorId, 10),
@@ -312,6 +316,7 @@ const AddMovieForm = ({
           description: "",
           duration: "",
           releaseDate: "",
+          screeningEndDate: "",
           language: "한국어",
           director: "",
           distributorId: "",
@@ -369,6 +374,12 @@ const AddMovieForm = ({
           required
         />
         <Input
+          name="language"
+          label="언어"
+          value={formData.language}
+          onChange={handleChange}
+        />
+        <Input
           name="releaseDate"
           label="개봉일"
           type="date"
@@ -377,9 +388,10 @@ const AddMovieForm = ({
           required
         />
         <Input
-          name="language"
-          label="언어"
-          value={formData.language}
+          name="screeningEndDate"
+          label="상영 종료일"
+          type="date"
+          value={formData.screeningEndDate}
           onChange={handleChange}
         />
         <FileInputWrapper
