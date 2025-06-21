@@ -116,7 +116,9 @@ const ActionButton = styled.button`
 
 const NavLinks = ({
   isAdminLoggedIn,
+  isUserLoggedIn,
   handleAdminLogout,
+  handleUserLogout,
   isMobile = false,
   onLinkClick = () => {},
 }) => {
@@ -171,6 +173,28 @@ const NavLinks = ({
           >
             <LogOut /> 로그아웃
           </ActionButton>
+        ) : isUserLoggedIn ? (
+          <>
+            <NavLinkStyled
+              to="/profile"
+              $isMobile={isMobile}
+              onClick={onLinkClick}
+              title="마이페이지"
+            >
+              <UserIcon /> 마이페이지
+            </NavLinkStyled>
+            <ActionButton
+              onClick={() => {
+                handleUserLogout();
+                onLinkClick();
+              }}
+              $isMobile={isMobile}
+              $isDanger
+              title="로그아웃"
+            >
+              <LogOut /> 로그아웃
+            </ActionButton>
+          </>
         ) : (
           <>
             <NavLinkStyled
@@ -180,14 +204,6 @@ const NavLinks = ({
               title="로그인"
             >
               <UserIcon /> 로그인
-            </NavLinkStyled>
-            <NavLinkStyled
-              to="/profile"
-              $isMobile={isMobile}
-              onClick={onLinkClick}
-              title="마이페이지"
-            >
-              <UserIcon /> 마이페이지
             </NavLinkStyled>
             <NavLinkStyled
               to="/admin/login"

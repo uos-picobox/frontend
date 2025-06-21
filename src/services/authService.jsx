@@ -56,7 +56,7 @@ export const checkEmailAvailability = async (email) => {
 /**
  * Login a user.
  * @param {{ loginId, password }} credentials
- * @returns {Promise<{token: string, user: object}>}
+ * @returns {Promise<{sessionId: string, user: object}>}
  */
 export const login = async (credentials) => {
   try {
@@ -64,12 +64,38 @@ export const login = async (credentials) => {
       API_ENDPOINTS_USER.LOGIN,
       credentials
     );
-    if (response && response.token) {
-      localStorage.setItem("authToken", response.token);
-      if (response.user)
-        localStorage.setItem("userData", JSON.stringify(response.user));
+
+    console.log("Login API response:", response);
+
+    // 실제 API 응답 구조: { loginId, sessionId, expiresAt }
+    if (response && response.sessionId && response.loginId) {
+      // sessionId와 expiresAt 저장
+      localStorage.setItem("sessionId", response.sessionId);
+      if (response.expiresAt) {
+        localStorage.setItem("sessionExpiresAt", response.expiresAt);
+      }
+
+      // user 객체가 없으므로 loginId 기반으로 사용자 정보 생성
+      const user = {
+        id: Math.floor(Math.random() * 1000) + 1, // 임시 ID
+        loginId: response.loginId,
+        name: response.loginId + "_사용자",
+        email: response.loginId + "@example.com",
+        roles: ["ROLE_USER"],
+        isAdmin: false,
+      };
+
+      localStorage.setItem("userData", JSON.stringify(user));
+
+      // AuthContext에서 기대하는 형태로 응답 변환
+      return {
+        sessionId: response.sessionId,
+        user: user,
+        expiresAt: response.expiresAt,
+      };
     }
-    return response;
+
+    throw new Error("Invalid login response format");
   } catch (error) {
     console.error("Login error in authService:", error);
     throw error;
@@ -79,7 +105,7 @@ export const login = async (credentials) => {
 /**
  * Login an admin.
  * @param {{ username, password }} credentials
- * @returns {Promise<{token: string, user: object}>}
+ * @returns {Promise<{sessionId: string, user: object}>}
  */
 export const adminLogin = async (credentials) => {
   try {
@@ -87,8 +113,8 @@ export const adminLogin = async (credentials) => {
     const loginEndpoint =
       API_ENDPOINTS_ADMIN.ADMIN_LOGIN || API_ENDPOINTS_USER.LOGIN; // config.js에 ADMIN_LOGIN 추가 필요
     const response = await apiClient.post(loginEndpoint, credentials);
-    if (response && response.token) {
-      localStorage.setItem("authToken", response.token);
+    if (response && response.sessionId) {
+      localStorage.setItem("sessionId", response.sessionId);
       if (
         response.user &&
         (response.user.isAdmin || response.user.roles?.includes("ROLE_ADMIN"))
@@ -105,8 +131,18 @@ export const adminLogin = async (credentials) => {
   }
 };
 
-export const logout = () => {
-  localStorage.removeItem("authToken");
-  localStorage.removeItem("userData");
-  localStorage.removeItem("adminData");
+export const logout = async () => {
+  try {
+    // 백엔드에 로그아웃 API 호출
+    await apiClient.post(API_ENDPOINTS_USER.LOGOUT);
+  } catch (error) {
+    console.error("Logout error in authService:", error);
+    // 로그아웃 API 호출 실패해도 로컬 세션은 정리
+  } finally {
+    // 로컬 스토리지에서 세션 정보 제거
+    localStorage.removeItem("sessionId");
+    localStorage.removeItem("sessionExpiresAt");
+    localStorage.removeItem("userData");
+    localStorage.removeItem("adminData");
+  }
 };

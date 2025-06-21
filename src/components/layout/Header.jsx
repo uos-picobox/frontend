@@ -164,7 +164,9 @@ const Header = ({
   isMobileMenuOpen,
   setIsMobileMenuOpen,
   isAdminLoggedIn,
+  isUserLoggedIn,
   handleAdminLogout,
+  handleUserLogout,
 }) => {
   const navigate = useNavigate();
 
@@ -182,6 +184,7 @@ const Header = ({
         <DesktopNav>
           <NavLinks
             isAdminLoggedIn={isAdminLoggedIn}
+            isUserLoggedIn={isUserLoggedIn}
             isMobile={false}
             onLinkClick={closeMobileMenu} // Though not strictly needed for desktop, good for consistency
           />
@@ -198,6 +201,15 @@ const Header = ({
           {isAdminLoggedIn ? (
             <>
               <DesktopAuthButtonAction onClick={handleAdminLogout} $isDanger>
+                <LogOut size={16} /> 로그아웃
+              </DesktopAuthButtonAction>
+            </>
+          ) : isUserLoggedIn ? (
+            <>
+              <DesktopAuthLink to="/profile">
+                <UserIcon size={16} /> 마이페이지
+              </DesktopAuthLink>
+              <DesktopAuthButtonAction onClick={handleUserLogout} $isDanger>
                 <LogOut size={16} /> 로그아웃
               </DesktopAuthButtonAction>
             </>
@@ -223,7 +235,9 @@ const Header = ({
       <MobileMenu $isOpen={isMobileMenuOpen}>
         <NavLinks
           isAdminLoggedIn={isAdminLoggedIn}
+          isUserLoggedIn={isUserLoggedIn}
           handleAdminLogout={handleAdminLogout}
+          handleUserLogout={handleUserLogout}
           isMobile={true}
           onLinkClick={closeMobileMenu}
         />

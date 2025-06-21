@@ -12,10 +12,10 @@ const ProfilePageWrapper = styled.div`
   border-radius: ${({ theme }) => theme.borderRadius.xl};
   box-shadow: ${({ theme }) => theme.shadows.lg};
   margin-top: ${({ theme }) => theme.spacing[6]};
-  max-width: 900px; /* Added max-width for better layout on large screens */
+  max-width: 900px;
   margin-left: auto;
   margin-right: auto;
-
+  margin-bottom: ${({ theme }) => theme.spacing[12]};
   @media (min-width: ${({ theme }) => theme.breakpoints.md}) {
     padding: ${({ theme }) => theme.spacing[6]};
   }

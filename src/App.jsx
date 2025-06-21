@@ -40,10 +40,10 @@ const MainContent = styled.main`
 
 // ProtectedRoute for admin pages
 const AdminProtectedRoute = ({ children }) => {
-  const { isAdmin, isLoading: isAuthLoading } = useAuth();
+  const { isAdmin, isLoadingAuth } = useAuth();
   const location = useLocation();
 
-  if (isAuthLoading) {
+  if (isLoadingAuth) {
     return <p>인증 정보 확인 중...</p>; // Or a spinner
   }
 
@@ -59,22 +59,22 @@ const AdminProtectedRoute = ({ children }) => {
 
 // ProtectedRoute for user-specific pages like profile
 const UserProtectedRoute = ({ children }) => {
-  const { user, token, isLoading: isAuthLoading } = useAuth();
+  const { user, sessionId, isLoadingAuth } = useAuth();
   const location = useLocation();
 
-  if (isAuthLoading) {
+  if (isLoadingAuth) {
     return <p>인증 정보 확인 중...</p>;
   }
 
-  if (!token || !user) {
-    // Check for token and user object
+  if (!sessionId || !user) {
+    // Check for sessionId and user object
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
   return children;
 };
 
 function App() {
-  const { token, isAdmin, logout: authLogout } = useAuth();
+  const { sessionId, isAdmin, user, logout: authLogout } = useAuth();
   // selectedMovie state is removed. Movie ID will be passed via URL params.
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navigate = useNavigate(); // React Router's navigate function
@@ -86,9 +86,14 @@ function App() {
     setIsMobileMenuOpen(false); // Close mobile menu on navigation
   }, [location.pathname]);
 
-  const handleAdminLogout = () => {
-    authLogout();
+  const handleAdminLogout = async () => {
+    await authLogout();
     navigate("/"); // Redirect to home after admin logout
+  };
+
+  const handleUserLogout = async () => {
+    await authLogout();
+    navigate("/"); // Redirect to home after user logout
   };
 
   // The `MapsTo` prop in Header and other components will now use React Router's Link or navigate
@@ -98,8 +103,10 @@ function App() {
       <Header
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
-        isAdminLoggedIn={!!token && isAdmin}
+        isAdminLoggedIn={!!sessionId && isAdmin}
+        isUserLoggedIn={!!sessionId && !!user && !isAdmin}
         handleAdminLogout={handleAdminLogout}
+        handleUserLogout={handleUserLogout}
         // No need for currentPage, selectedMovie, movies here if NavLinks use <NavLink>
       />
       <MainContent className="main-content-area">

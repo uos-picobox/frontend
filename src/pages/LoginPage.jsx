@@ -88,19 +88,34 @@ const ErrorMessageUI = styled.p`
 `;
 
 const LoginPage = () => {
-  const { login, isLoading, authError, clearAuthError, isAdmin } = useAuth();
+  const { login, isLoadingAuth, authError, clearAuthError, isAdmin } =
+    useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [loginId, setLoginId] = useState("");
+  const [loginId, setLoginId] = useState(() => {
+    // 페이지 로드 시 저장된 아이디가 있으면 불러오기
+    return localStorage.getItem("rememberedLoginId") || "";
+  });
   const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(() => {
+    // 저장된 아이디가 있으면 체크박스도 체크된 상태로 시작
+    return !!localStorage.getItem("rememberedLoginId");
+  });
 
   const from = location.state?.from?.pathname || (isAdmin ? "/admin" : "/"); // Redirect to admin if isAdmin, else home
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     clearAuthError();
+
+    // 아이디 저장 기능 처리
+    if (rememberMe) {
+      localStorage.setItem("rememberedLoginId", loginId);
+    } else {
+      localStorage.removeItem("rememberedLoginId");
+    }
+
     const success = await login({ loginId, password });
     if (success) {
       // After successful login, AuthContext updates isAdmin state.
@@ -127,7 +142,13 @@ const LoginPage = () => {
           label="아이디"
           type="text"
           value={loginId}
-          onChange={(e) => setLoginId(e.target.value)}
+          onChange={(e) => {
+            setLoginId(e.target.value);
+            // 아이디를 직접 수정하면 rememberMe 상태도 업데이트
+            if (e.target.value === "") {
+              setRememberMe(false);
+            }
+          }}
           placeholder="아이디를 입력하세요"
           required
         />
@@ -162,8 +183,13 @@ const LoginPage = () => {
             비밀번호를 잊으셨나요?
           </StyledLink>
         </OptionsRow>
-        <Button type="submit" variant="primary" fullWidth disabled={isLoading}>
-          {isLoading ? "로그인 중..." : "로그인"}
+        <Button
+          type="submit"
+          variant="primary"
+          fullWidth
+          disabled={isLoadingAuth}
+        >
+          {isLoadingAuth ? "로그인 중..." : "로그인"}
         </Button>
       </Form>
       <ExtraLinks>

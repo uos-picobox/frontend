@@ -1,8 +1,8 @@
 // src/services/apiClient.js
 import { API_BASE_URL } from "../constants/config";
 
-const getAuthToken = () => {
-  return localStorage.getItem("authToken");
+const getSessionId = () => {
+  return localStorage.getItem("sessionId");
 };
 
 const handleResponse = async (response) => {
@@ -51,12 +51,12 @@ const handleResponse = async (response) => {
 
 const apiClient = {
   get: async (endpoint, params = null) => {
-    const token = getAuthToken();
+    const sessionId = getSessionId();
     const headers = {
       // 'Content-Type': 'application/json', // Not needed for GET usually
     };
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
+    if (sessionId) {
+      headers["sessionId"] = sessionId;
     }
 
     let url = `${API_BASE_URL}${endpoint}`;
@@ -78,10 +78,10 @@ const apiClient = {
   },
 
   post: async (endpoint, data, isFormData = false) => {
-    const token = getAuthToken();
+    const sessionId = getSessionId();
     const headers = {};
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
+    if (sessionId) {
+      headers["sessionId"] = sessionId;
     }
 
     let body;
@@ -118,10 +118,10 @@ const apiClient = {
   },
 
   put: async (endpoint, data, isFormData = false) => {
-    const token = getAuthToken();
+    const sessionId = getSessionId();
     const headers = {};
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
+    if (sessionId) {
+      headers["sessionId"] = sessionId;
     }
 
     let body;
@@ -142,12 +142,12 @@ const apiClient = {
 
   delete: async (endpoint, data = null) => {
     // DELETE can sometimes have a body for multiple deletions, though rare
-    const token = getAuthToken();
+    const sessionId = getSessionId();
     const headers = {
       // 'Content-Type': 'application/json', // Only if body is present and JSON
     };
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
+    if (sessionId) {
+      headers["sessionId"] = sessionId;
     }
 
     const config = {

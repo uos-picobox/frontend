@@ -4,21 +4,44 @@ import * as authService from "../services/authService";
 
 const AuthContext = createContext(null);
 
-const DEV_MODE_MOCK_AUTH_ENABLED = true;
-const DEV_MODE_MOCK_AS_ADMIN = true;
+const DEV_MODE_MOCK_AUTH_ENABLED = false;
+const DEV_MODE_MOCK_AS_ADMIN = false;
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [token, setToken] = useState(() => localStorage.getItem("authToken"));
+  const [sessionId, setSessionId] = useState(() =>
+    localStorage.getItem("sessionId")
+  );
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [authError, setAuthError] = useState(null);
 
   useEffect(() => {
     const loadUserFromStorage = () => {
-      const storedToken = localStorage.getItem("authToken");
-      if (storedToken) {
-        setToken(storedToken);
+      const storedSessionId = localStorage.getItem("sessionId");
+      const storedExpiresAt = localStorage.getItem("sessionExpiresAt");
+
+      // 세션 만료 확인
+      if (storedSessionId && storedExpiresAt) {
+        const expiryTime = new Date(storedExpiresAt);
+        const now = new Date();
+
+        if (now >= expiryTime) {
+          console.log("Session expired, clearing stored data");
+          localStorage.removeItem("sessionId");
+          localStorage.removeItem("sessionExpiresAt");
+          localStorage.removeItem("userData");
+          localStorage.removeItem("adminData");
+          setUser(null);
+          setIsAdmin(false);
+          setSessionId(null);
+          setIsLoadingAuth(false);
+          return;
+        }
+      }
+
+      if (storedSessionId) {
+        setSessionId(storedSessionId);
         const storedAdminData = localStorage.getItem("adminData");
         if (storedAdminData) {
           try {
@@ -45,7 +68,7 @@ export const AuthProvider = ({ children }) => {
       } else {
         if (DEV_MODE_MOCK_AUTH_ENABLED) {
           console.warn(
-            "AuthContext: No authToken found. Using MOCK USER for development."
+            "AuthContext: No sessionId found. Using MOCK USER for development."
           );
           const mockUserObject = {
             id: DEV_MODE_MOCK_AS_ADMIN ? 999 : 998,
@@ -65,7 +88,7 @@ export const AuthProvider = ({ children }) => {
           };
           setUser(mockUserObject);
           setIsAdmin(DEV_MODE_MOCK_AS_ADMIN);
-          setToken("mock_dev_auth_token");
+          setSessionId("mock_dev_session_id");
           if (DEV_MODE_MOCK_AS_ADMIN) {
             localStorage.setItem("adminData", JSON.stringify(mockUserObject));
           } else {
@@ -74,7 +97,7 @@ export const AuthProvider = ({ children }) => {
         } else {
           setUser(null);
           setIsAdmin(false);
-          setToken(null);
+          setSessionId(null);
         }
       }
       setIsLoadingAuth(false);
@@ -83,9 +106,15 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const handleLoginResponse = (response, isAdminLoginAttempt = false) => {
-    if (response && response.token) {
-      setToken(response.token);
-      localStorage.setItem("authToken", response.token);
+    console.log(
+      "handleLoginResponse called with:",
+      response,
+      isAdminLoginAttempt
+    );
+
+    if (response && response.sessionId) {
+      setSessionId(response.sessionId);
+      localStorage.setItem("sessionId", response.sessionId);
 
       if (response.user) {
         setUser(response.user);
@@ -94,6 +123,11 @@ export const AuthProvider = ({ children }) => {
           (response.user.roles?.includes("ROLE_ADMIN") ||
             response.user.isAdmin === true);
         setIsAdmin(determinedIsAdmin);
+
+        // 일반 사용자 로그인 시 관리자가 아님을 명확히 설정
+        if (!isAdminLoginAttempt) {
+          setIsAdmin(false);
+        }
         if (determinedIsAdmin) {
           localStorage.setItem("adminData", JSON.stringify(response.user));
           localStorage.removeItem("userData");
@@ -101,6 +135,13 @@ export const AuthProvider = ({ children }) => {
           localStorage.setItem("userData", JSON.stringify(response.user));
           localStorage.removeItem("adminData");
         }
+
+        console.log(
+          "Login successful - User:",
+          response.user,
+          "IsAdmin:",
+          determinedIsAdmin
+        );
       } else {
         setUser(null);
         setIsAdmin(isAdminLoginAttempt);
@@ -143,32 +184,37 @@ export const AuthProvider = ({ children }) => {
     setIsLoadingAuth(true);
     setAuthError(null);
     try {
-      const response = await authService.adminLogin(credentials);
-      if (handleLoginResponse(response, true)) {
-        if (
-          !response.user ||
-          !(
-            response.user.roles?.includes("ROLE_ADMIN") ||
-            response.user.isAdmin === true
-          )
-        ) {
-          // `handleLoginResponse`에서 이미 토큰과 임시 adminData를 저장했을 수 있으므로, 여기서 로그아웃 처리하여 확실히 정리
-          authService.logout();
-          setToken(null);
-          setUser(null);
-          setIsAdmin(false);
-          setAuthError(null);
-          throw new Error("관리자 계정이 아닙니다.");
+      // 임시 관리자 로그인 로직 (API가 없으므로)
+      if (
+        credentials.username === "admin" &&
+        credentials.password === "password123"
+      ) {
+        // Mock 관리자 응답 생성
+        const mockAdminResponse = {
+          sessionId: "mock_admin_session_" + Date.now(),
+          user: {
+            id: 1,
+            loginId: "admin",
+            username: "admin",
+            name: "시스템 관리자",
+            email: "admin@picobox.com",
+            roles: ["ROLE_ADMIN", "ROLE_USER"],
+            isAdmin: true,
+          },
+        };
+
+        if (handleLoginResponse(mockAdminResponse, true)) {
+          return true;
         }
-        return true;
+        return false;
+      } else {
+        // 잘못된 크리덴셜
+        setAuthError(
+          "관리자 로그인 실패. 아이디 또는 비밀번호를 확인해주세요."
+        );
+        return false;
       }
-      return false;
     } catch (error) {
-      // 이미 위에서 로그아웃 처리되었을 수 있지만, 만약을 위해 여기서도 호출
-      authService.logout();
-      setToken(null);
-      setUser(null);
-      setIsAdmin(false);
       setAuthError(
         error.message ||
           "관리자 로그인 실패. 아이디 또는 비밀번호를 확인해주세요."
@@ -177,7 +223,7 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setIsLoadingAuth(false);
     }
-  }, []); // logout을 의존성 배열에 추가할 필요는 없음. logout은 상태를 바꾸는 함수.
+  }, []);
 
   const signup = useCallback(async (signupData) => {
     setIsLoadingAuth(true);
@@ -197,10 +243,10 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  const logout = useCallback(() => {
-    // adminLogin에서 logout을 호출하므로, logout 자체도 useCallback으로 감싸줍니다.
-    authService.logout();
-    setToken(null);
+  const logout = useCallback(async () => {
+    // logout 함수를 async로 변경
+    await authService.logout();
+    setSessionId(null);
     setUser(null);
     setIsAdmin(false);
     setAuthError(null);
@@ -275,7 +321,7 @@ export const AuthProvider = ({ children }) => {
   const value = {
     user,
     isAdmin,
-    token,
+    sessionId,
     isLoadingAuth,
     authError,
     login,
@@ -286,7 +332,7 @@ export const AuthProvider = ({ children }) => {
     verifyAuthMail,
     checkLoginId,
     checkEmail,
-    clearAuthError: useCallback(() => setAuthError(null), []), // clearAuthError도 useCallback으로 감싸서 value 객체가 불필요하게 재생성되지 않도록 합니다.
+    clearAuthError: useCallback(() => setAuthError(null), []),
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
