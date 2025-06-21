@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import FeaturedMovie from "../components/movie/FeaturedMovie";
 import MovieCard from "../components/movie/MovieCard";
 import * as movieService from "../services/movieService"; // movieService 임포트
+import { separateMoviesByStatus } from "../utils/dateUtils"; // 날짜 유틸리티 함수 임포트
 
 const HomePageWrapper = styled.div`
   display: flex;
@@ -13,6 +14,7 @@ const HomePageWrapper = styled.div`
   max-width: ${({ theme }) => theme.breakpoints.xl};
   margin-left: auto;
   margin-right: auto;
+  padding-top: ${({ theme }) => theme.spacing[6]};
 `;
 
 const Section = styled.section``;
@@ -104,8 +106,9 @@ const SkeletonMovieCard = styled.div`
 `;
 
 const HomePage = () => {
-  const [movies, setMovies] = useState([]);
-  const [featuredMovie, setFeaturedMovie] = useState(null);
+  const [allMovies, setAllMovies] = useState([]);
+  const [currentlyShowing, setCurrentlyShowing] = useState([]);
+  const [upcomingMovies, setUpcomingMovies] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
@@ -117,10 +120,17 @@ const HomePage = () => {
       try {
         const moviesData = await movieService.getPublicAllMovies();
         if (moviesData && moviesData.length > 0) {
-          setFeaturedMovie(moviesData[0]);
-          setMovies(moviesData);
+          setAllMovies(moviesData);
+
+          // 영화를 현재 상영중과 개봉예정으로 분류
+          const { currentlyShowing: showing, upcoming } =
+            separateMoviesByStatus(moviesData);
+          setCurrentlyShowing(showing);
+          setUpcomingMovies(upcoming);
         } else {
-          setMovies([]);
+          setAllMovies([]);
+          setCurrentlyShowing([]);
+          setUpcomingMovies([]);
         }
       } catch (err) {
         console.error("Failed to fetch public movies for HomePage:", err);
@@ -177,10 +187,10 @@ const HomePage = () => {
 
   return (
     <HomePageWrapper>
-      {featuredMovie && (
+      {currentlyShowing.length > 0 && (
         <Section>
           <FeaturedMovie
-            movie={featuredMovie}
+            movies={currentlyShowing}
             onMovieSelect={handleMovieSelect}
           />
         </Section>
@@ -188,9 +198,9 @@ const HomePage = () => {
 
       <Section>
         <SectionTitle>현재 상영중</SectionTitle>
-        {movies.length > 0 ? (
+        {currentlyShowing.length > 0 ? (
           <MovieGrid>
-            {movies.map((movie) => (
+            {currentlyShowing.map((movie) => (
               <MovieCard
                 key={movie.movieId}
                 movie={movie}
@@ -202,22 +212,23 @@ const HomePage = () => {
           <p>현재 상영중인 영화가 없습니다.</p>
         )}
       </Section>
+
       <UpcomingSection>
         <SectionTitle>개봉 예정</SectionTitle>
-        <MovieGrid>
-          {[...Array(6)].map(
-            (
-              _,
-              index // Placeholder for upcoming
-            ) => (
-              <SkeletonMovieCard key={`upcoming-${index}`}>
-                <div className="poster-skeleton"></div>
-                <div className="title-skeleton"></div>
-                <div className="detail-skeleton"></div>
-              </SkeletonMovieCard>
-            )
-          )}
-        </MovieGrid>
+        {upcomingMovies.length > 0 ? (
+          <MovieGrid>
+            {upcomingMovies.map((movie) => (
+              <MovieCard
+                key={movie.movieId}
+                movie={movie}
+                onMovieSelect={handleMovieSelect}
+                isUpcoming={true}
+              />
+            ))}
+          </MovieGrid>
+        ) : (
+          <p>개봉 예정인 영화가 없습니다.</p>
+        )}
       </UpcomingSection>
     </HomePageWrapper>
   );

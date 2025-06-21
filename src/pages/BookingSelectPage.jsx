@@ -3,6 +3,7 @@ import styled from "styled-components";
 import { useNavigate } from "react-router-dom";
 import * as movieService from "../services/movieService";
 import MovieCard from "../components/movie/MovieCard";
+import { separateMoviesByStatus } from "../utils/dateUtils";
 
 const PageWrapper = styled.div`
   width: 100%;
@@ -107,8 +108,36 @@ const SkeletonMovieCard = styled.div`
   }
 `;
 
+const SectionTitle = styled.h2`
+  font-size: ${({ theme }) => theme.fontSizes["2xl"]};
+  font-weight: 600;
+  margin-bottom: ${({ theme }) => theme.spacing[4]};
+  margin-top: ${({ theme }) => theme.spacing[8]};
+  color: ${({ theme }) => theme.colors.primaryLight};
+
+  &:first-of-type {
+    margin-top: 0;
+  }
+
+  @media (min-width: ${({ theme }) => theme.breakpoints.md}) {
+    font-size: ${({ theme }) => theme.fontSizes["3xl"]};
+  }
+`;
+
+const InfoMessage = styled.div`
+  background-color: ${({ theme }) => theme.colors.surface};
+  border: 1px solid ${({ theme }) => theme.colors.primary + "40"};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  padding: ${({ theme }) => theme.spacing[4]};
+  margin-bottom: ${({ theme }) => theme.spacing[6]};
+  color: ${({ theme }) => theme.colors.text};
+  font-size: ${({ theme }) => theme.fontSizes.sm};
+  text-align: center;
+`;
+
 const BookingSelectPage = () => {
-  const [movies, setMovies] = useState([]);
+  const [currentlyShowing, setCurrentlyShowing] = useState([]);
+  const [upcomingMovies, setUpcomingMovies] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
@@ -119,7 +148,17 @@ const BookingSelectPage = () => {
       setError(null);
       try {
         const moviesData = await movieService.getPublicAllMovies();
-        setMovies(moviesData || []);
+
+        if (moviesData && moviesData.length > 0) {
+          // 영화를 현재 상영중과 개봉예정으로 분류
+          const { currentlyShowing: showing, upcoming } =
+            separateMoviesByStatus(moviesData);
+          setCurrentlyShowing(showing);
+          setUpcomingMovies(upcoming);
+        } else {
+          setCurrentlyShowing([]);
+          setUpcomingMovies([]);
+        }
       } catch (err) {
         console.error("Failed to fetch movies for booking selection:", err);
         setError(err.message || "영화 목록을 불러오는데 실패했습니다.");
@@ -163,7 +202,10 @@ const BookingSelectPage = () => {
     );
   }
 
-  if (movies.length === 0) {
+  const hasCurrentlyShowing = currentlyShowing.length > 0;
+  const hasUpcomingMovies = upcomingMovies.length > 0;
+
+  if (!hasCurrentlyShowing && !hasUpcomingMovies) {
     return (
       <PageWrapper>
         <PageTitle>예매하기</PageTitle>
@@ -179,16 +221,47 @@ const BookingSelectPage = () => {
     <PageWrapper>
       <PageTitle>예매하기</PageTitle>
       <PageSubtitle>예매할 영화를 선택해주세요</PageSubtitle>
-      <MovieGrid>
-        {movies.map((movie) => (
-          <MovieCard
-            key={movie.movieId}
-            movie={movie}
-            onMovieSelect={(selectedMovie) => handleMovieSelect(selectedMovie)}
-            showBookingButton={true}
-          />
-        ))}
-      </MovieGrid>
+
+      {hasCurrentlyShowing && (
+        <>
+          <SectionTitle>현재 상영중 (예매 가능)</SectionTitle>
+          <MovieGrid>
+            {currentlyShowing.map((movie) => (
+              <MovieCard
+                key={movie.movieId}
+                movie={movie}
+                onMovieSelect={(selectedMovie) =>
+                  handleMovieSelect(selectedMovie)
+                }
+                showBookingButton={true}
+              />
+            ))}
+          </MovieGrid>
+        </>
+      )}
+
+      {hasUpcomingMovies && (
+        <>
+          <SectionTitle>개봉 예정 (예매 불가)</SectionTitle>
+          <InfoMessage>
+            아래 영화들은 아직 개봉 전이므로 예매할 수 없습니다. 상세 정보만
+            확인 가능합니다.
+          </InfoMessage>
+          <MovieGrid>
+            {upcomingMovies.map((movie) => (
+              <MovieCard
+                key={movie.movieId}
+                movie={movie}
+                onMovieSelect={(selectedMovie) =>
+                  navigate(`/movies/${selectedMovie.movieId}`)
+                }
+                showBookingButton={true}
+                isUpcoming={true}
+              />
+            ))}
+          </MovieGrid>
+        </>
+      )}
     </PageWrapper>
   );
 };
