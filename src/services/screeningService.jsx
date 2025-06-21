@@ -7,27 +7,65 @@ import {
 } from "../constants/config"; // API_ENDPOINTS_USER 추가 (공개 API용)
 import { mockPublicScreenings } from "../constants/mockData";
 
-// --- Public/User Facing (Using Mock Data) ---
+// --- Public/User Facing (Using Real API) ---
 /**
- * Fetches screenings for a specific movie on a specific date for user display using MOCK DATA.
+ * Fetches all screenings for a specific date for user display using REAL API.
+ * @param {string} date - Date in 'YYYY-MM-DD' format
+ * @returns {Promise<ScreeningResponseDto[]>}
+ */
+export const getPublicScreeningsByDate = async (date) => {
+  console.log(
+    `screeningService: getPublicScreeningsByDate called for date ${date} (using real API)`
+  );
+  try {
+    const screeningsData = await apiClient.get(
+      API_ENDPOINTS_USER.SCREENINGS_GET_ALL,
+      { date }
+    );
+    return ensureArray(screeningsData);
+  } catch (error) {
+    console.error(
+      `screeningService: getPublicScreeningsByDate error for date ${date}:`,
+      error
+    );
+    // Fallback to mock data if API fails
+    console.log("Falling back to mock data");
+    const filteredScreenings = mockPublicScreenings.filter(
+      (s) => s.screeningDate === date
+    );
+    return JSON.parse(JSON.stringify(filteredScreenings));
+  }
+};
+
+/**
+ * Fetches screenings for a specific movie on a specific date for user display using REAL API.
  * @param {number|string} movieId
  * @param {string} date - Date in 'YYYY-MM-DD' format
  * @returns {Promise<ScreeningResponseDto[]>}
  */
 export const getPublicScreeningsForMovieDate = async (movieId, date) => {
   console.log(
-    `screeningService: getPublicScreeningsForMovieDate called for movie ${movieId}, date ${date} (using mock data)`
+    `screeningService: getPublicScreeningsForMovieDate called for movie ${movieId}, date ${date} (using real API)`
   );
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      const filteredScreenings = mockPublicScreenings.filter(
-        (s) =>
-          s.movie.movieId.toString() === movieId.toString() &&
-          s.screeningDate === date
-      );
-      resolve(JSON.parse(JSON.stringify(filteredScreenings)));
-    }, 250);
-  });
+  try {
+    const screeningsData = await apiClient.get(
+      API_ENDPOINTS_USER.SCREENINGS_FOR_MOVIE_DATE(movieId, date)
+    );
+    return ensureArray(screeningsData);
+  } catch (error) {
+    console.error(
+      `screeningService: getPublicScreeningsForMovieDate error for movie ${movieId}, date ${date}:`,
+      error
+    );
+    // Fallback to mock data if API fails
+    console.log("Falling back to mock data");
+    const filteredScreenings = mockPublicScreenings.filter(
+      (s) =>
+        s.movie.movieId.toString() === movieId.toString() &&
+        s.screeningDate === date
+    );
+    return JSON.parse(JSON.stringify(filteredScreenings));
+  }
 };
 
 // --- Admin Specific (Using Live API) ---
@@ -57,7 +95,23 @@ export const getScreeningById = async (screeningId) => {
  * @returns {Promise<ScreeningResponseDto>}
  */
 export const addScreening = async (screeningData) => {
-  return apiClient.post(API_ENDPOINTS_ADMIN.SCREENING_CREATE, screeningData);
+  console.log(
+    "screeningService: addScreening called with data:",
+    screeningData
+  );
+  console.log("API endpoint:", API_ENDPOINTS_ADMIN.SCREENING_CREATE);
+
+  try {
+    const result = await apiClient.post(
+      API_ENDPOINTS_ADMIN.SCREENING_CREATE,
+      screeningData
+    );
+    console.log("screeningService: addScreening successful:", result);
+    return result;
+  } catch (error) {
+    console.error("screeningService: addScreening error:", error);
+    throw error;
+  }
 };
 
 /**

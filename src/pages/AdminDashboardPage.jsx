@@ -399,8 +399,14 @@ const ActorFormWrapper = ({ isEditMode }) => {
           await actorService.updateActor(id, data);
         }
       } else {
-        // 추가 시에는 항상 이미지가 포함된 FormData
-        await actorService.addActorWithImage(data);
+        // 새 배우 추가 시: 이미지 유무에 따라 다른 API 호출
+        if (hasNewImage) {
+          // data는 FormData 객체
+          await actorService.addActorWithImage(data);
+        } else {
+          // data는 순수 JSON 객체
+          await actorService.addActor(data);
+        }
       }
       alert(
         `배우 정보가 성공적으로 ${
@@ -786,12 +792,21 @@ const ItemFormContainer = ({
 
   const handleSubmit = async (data) => {
     // 간단한 폼들은 이미지 처리가 없으므로 data만 받음
+    console.log("ItemFormContainer: handleSubmit called with data:", data);
+    console.log("ItemFormContainer: isEditMode:", isEditMode);
+    console.log("ItemFormContainer: title:", title);
+
     try {
+      let result;
       if (isEditMode) {
-        await updateFunction(id, data);
+        console.log("ItemFormContainer: calling updateFunction with id:", id);
+        result = await updateFunction(id, data);
       } else {
-        await addFunction(data);
+        console.log("ItemFormContainer: calling addFunction");
+        result = await addFunction(data);
       }
+
+      console.log("ItemFormContainer: operation successful:", result);
 
       alert(
         `${title}이(가) 성공적으로 ${
@@ -802,6 +817,8 @@ const ItemFormContainer = ({
       navigate(`/admin/${location.pathname.split("/")[2]}`);
     } catch (err) {
       console.error(`${title} 저장 실패:`, err);
+      console.error("Error details:", err.details);
+      console.error("Error status:", err.status);
       throw err;
     }
   };
