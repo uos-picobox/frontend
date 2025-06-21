@@ -100,7 +100,8 @@ export const API_ENDPOINTS_USER = {
   SIGNUP_CHECK_EMAIL: (email) => `/api/user/signup/check/email?email=${email}`,
   SIGNUP_REQUEST_EMAIL_VERIFICATION: `/api/user/signup/verify/email`,
   SIGNUP_AUTH_EMAIL_CODE: `/api/user/signup/auth/email`,
-  LOGIN: `/api/user/login`, // Assuming a general login endpoint
+  LOGIN: `/api/user/signin`, // Updated to new signin endpoint
+  LOGOUT: `/api/user/signout`, // New signout endpoint
 };
 
 // --- UI Constants & Fallbacks ---

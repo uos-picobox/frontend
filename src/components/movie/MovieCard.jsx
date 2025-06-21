@@ -51,6 +51,22 @@ const UpcomingBadge = styled.div`
   z-index: 2;
 `;
 
+const RankBadge = styled.div`
+  position: absolute;
+  top: ${({ theme }) => theme.spacing[2]};
+  left: ${({ theme }) => theme.spacing[2]};
+  background-color: ${({ theme }) => theme.colors.primary};
+  color: ${({ theme }) => theme.colors.white};
+  padding: ${({ theme }) => theme.spacing[1]} ${({ theme }) => theme.spacing[2]};
+  border-radius: ${({ theme }) => theme.borderRadius.base};
+  font-size: ${({ theme }) => theme.fontSizes.sm};
+  font-weight: 700;
+  z-index: 2;
+  min-width: 24px;
+  text-align: center;
+  opacity: 0.8;
+`;
+
 const HoverOverlay = styled.div`
   position: absolute;
   inset: 0;
@@ -135,12 +151,14 @@ const ReleaseDate = styled.div`
  * @param {function} props.onMovieSelect - Function to call when card is clicked.
  * @param {boolean} props.showBookingButton - Whether to show booking button text.
  * @param {boolean} props.isUpcoming - Whether the movie is upcoming (release date in future).
+ * @param {number} props.rank - The rank of the movie (only for currently showing movies).
  */
 const MovieCard = ({
   movie,
   onMovieSelect,
   showBookingButton = false,
   isUpcoming = false,
+  rank,
 }) => {
   if (!movie) return null;
 
@@ -187,6 +205,7 @@ const MovieCard = ({
     <CardWrapper onClick={handleCardClick} isUpcoming={isUpcoming}>
       <PosterImageContainer>
         {isUpcoming && <UpcomingBadge>개봉예정</UpcomingBadge>}
+        {!isUpcoming && rank && <RankBadge>{rank}</RankBadge>}
         <img
           src={
             movie.posterUrl ||

@@ -43,10 +43,10 @@ const ErrorMessageUI = styled.p`
 `;
 
 const AdminLoginPage = () => {
-  const { adminLogin, isLoading, authError, clearAuthError } = useAuth();
+  const { adminLogin, isLoadingAuth, authError, clearAuthError } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [username, setUsername] = useState("");
+  const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
 
   const from = location.state?.from?.pathname || "/admin/movies"; // Default admin page after login
@@ -54,7 +54,7 @@ const AdminLoginPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     clearAuthError();
-    const success = await adminLogin({ username, password });
+    const success = await adminLogin({ username: loginId, password });
     if (success) {
       navigate(from, { replace: true });
     }
@@ -66,12 +66,12 @@ const AdminLoginPage = () => {
       {authError && <ErrorMessageUI>{authError}</ErrorMessageUI>}
       <Form onSubmit={handleSubmit}>
         <Input
-          id="adminUsername"
-          name="adminUsername"
+          id="adminLoginId"
+          name="adminLoginId"
           label="사용자명"
           type="text"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
+          value={loginId}
+          onChange={(e) => setLoginId(e.target.value)}
           placeholder="admin"
           required
         />
@@ -89,9 +89,9 @@ const AdminLoginPage = () => {
           type="submit"
           variant="secondary"
           fullWidth
-          disabled={isLoading}
+          disabled={isLoadingAuth}
         >
-          {isLoading ? "로그인 중..." : "로그인"}
+          {isLoadingAuth ? "로그인 중..." : "로그인"}
         </Button>
       </Form>
     </AdminLoginPageWrapper>

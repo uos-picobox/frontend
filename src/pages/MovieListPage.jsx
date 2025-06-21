@@ -159,6 +159,7 @@ const MovieListPage = () => {
                 key={movie.movieId}
                 movie={movie}
                 onMovieSelect={handleMovieSelect}
+                rank={movie.rank}
               />
             ))}
           </MovieGrid>
