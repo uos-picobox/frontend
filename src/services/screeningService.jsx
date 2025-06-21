@@ -57,7 +57,23 @@ export const getScreeningById = async (screeningId) => {
  * @returns {Promise<ScreeningResponseDto>}
  */
 export const addScreening = async (screeningData) => {
-  return apiClient.post(API_ENDPOINTS_ADMIN.SCREENING_CREATE, screeningData);
+  console.log(
+    "screeningService: addScreening called with data:",
+    screeningData
+  );
+  console.log("API endpoint:", API_ENDPOINTS_ADMIN.SCREENING_CREATE);
+
+  try {
+    const result = await apiClient.post(
+      API_ENDPOINTS_ADMIN.SCREENING_CREATE,
+      screeningData
+    );
+    console.log("screeningService: addScreening successful:", result);
+    return result;
+  } catch (error) {
+    console.error("screeningService: addScreening error:", error);
+    throw error;
+  }
 };
 
 /**

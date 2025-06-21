@@ -93,11 +93,27 @@ const apiClient = {
       body = JSON.stringify(data);
     }
 
+    console.log("apiClient POST:", {
+      url: `${API_BASE_URL}${endpoint}`,
+      headers: headers,
+      data: data,
+      isFormData: isFormData,
+      bodyPreview: isFormData ? "[FormData]" : body,
+    });
+
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: "POST",
       headers,
       body,
     });
+
+    console.log("apiClient POST response:", {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      url: `${API_BASE_URL}${endpoint}`,
+    });
+
     return handleResponse(response);
   },
 
