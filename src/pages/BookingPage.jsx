@@ -37,6 +37,9 @@ const BookingPageWrapper = styled.div`
   @media (min-width: ${({ theme }) => theme.breakpoints.md}) {
     padding: ${({ theme }) => theme.spacing[6]};
   }
+  max-width: ${({ theme }) => theme.breakpoints.xl};
+  margin-left: auto;
+  margin-right: auto;
 `;
 const PageTitle = styled.h1`
   font-size: ${({ theme }) => theme.fontSizes["2xl"]};

@@ -86,10 +86,12 @@ export const API_ENDPOINTS_ADMIN = {
 };
 
 export const API_ENDPOINTS_USER = {
-  // Movies (Public - IF THESE ARE DIFFERENT FROM ADMIN GET, otherwise use admin ones or mock)
-  // 예시: MOVIES_GET_ALL: `${API_BASE_URL}/api/public/movies`,
-  // 예시: MOVIE_GET_BY_ID: (movieId) => `${API_BASE_URL}/api/public/movies/${movieId}`,
-  // 예시: SCREENINGS_FOR_MOVIE_DATE: (movieId, date) => `${API_BASE_URL}/api/public/screenings/movie/${movieId}?date=${date}`,
+  // Public Movie & Screening APIs
+  MOVIES_GET_ALL: `/api/movies`,
+  MOVIE_GET_BY_ID: (movieId) => `/api/movies/${movieId}`,
+  SCREENINGS_GET_ALL: `/api/screenings`,
+  SCREENINGS_FOR_MOVIE_DATE: (movieId, date) =>
+    `/api/movies/${movieId}/screenings?date=${date}`,
 
   // Signup & Auth related
   SIGNUP: `/api/user/signup`,

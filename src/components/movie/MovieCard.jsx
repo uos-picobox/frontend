@@ -107,8 +107,9 @@ const Details = styled.div`
  * @param {object} props
  * @param {MovieResponseDto} props.movie - The movie data.
  * @param {function} props.onMovieSelect - Function to call when card is clicked.
+ * @param {boolean} props.showBookingButton - Whether to show booking button text.
  */
-const MovieCard = ({ movie, onMovieSelect }) => {
+const MovieCard = ({ movie, onMovieSelect, showBookingButton = false }) => {
   if (!movie) return null;
 
   // MovieResponseDto has movieRating.ratingName and voteAverage (if available from API)
@@ -132,9 +133,9 @@ const MovieCard = ({ movie, onMovieSelect }) => {
     // Check if the click target is the button itself or its child
     if (e.target.closest("button")) {
       e.stopPropagation(); // Prevent card click if button is clicked
-      onMovieSelect(movie, true); // Pass a flag indicating booking intent
+      onMovieSelect(movie, showBookingButton); // Pass showBookingButton flag indicating booking intent
     } else {
-      onMovieSelect(movie);
+      onMovieSelect(movie, showBookingButton);
     }
   };
 
@@ -151,7 +152,9 @@ const MovieCard = ({ movie, onMovieSelect }) => {
           loading="lazy"
         />
         <HoverOverlay>
-          <BookButtonSmall>상세/예매</BookButtonSmall>
+          <BookButtonSmall>
+            {showBookingButton ? "예매하기" : "상세/예매"}
+          </BookButtonSmall>
         </HoverOverlay>
       </PosterImageContainer>
       <InfoSection>

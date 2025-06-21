@@ -7,27 +7,41 @@ import {
 } from "../constants/config";
 import { mockPublicMovies } from "../constants/mockData";
 
-// --- Public/User Facing (Using Mock Data) ---
+// --- Public/User Facing (Using Real API) ---
 export const getPublicAllMovies = async () => {
-  console.log("movieService: getPublicAllMovies called (using mock data)");
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve(JSON.parse(JSON.stringify(mockPublicMovies)));
-    }, 300);
-  });
+  console.log("movieService: getPublicAllMovies called (using real API)");
+  try {
+    const moviesData = await apiClient.get(API_ENDPOINTS_USER.MOVIES_GET_ALL);
+    return ensureArray(moviesData);
+  } catch (error) {
+    console.error("movieService: getPublicAllMovies error:", error);
+    // Fallback to mock data if API fails
+    console.log("Falling back to mock data");
+    return JSON.parse(JSON.stringify(mockPublicMovies));
+  }
 };
+
 export const getPublicMovieById = async (movieId) => {
   console.log(
-    `movieService: getPublicMovieById called for ID ${movieId} (using mock data)`
+    `movieService: getPublicMovieById called for ID ${movieId} (using real API)`
   );
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      const movie = mockPublicMovies.find(
-        (m) => m.movieId.toString() === movieId.toString()
-      );
-      resolve(movie ? JSON.parse(JSON.stringify(movie)) : null);
-    }, 200);
-  });
+  try {
+    const movieData = await apiClient.get(
+      API_ENDPOINTS_USER.MOVIE_GET_BY_ID(movieId)
+    );
+    return movieData;
+  } catch (error) {
+    console.error(
+      `movieService: getPublicMovieById error for ID ${movieId}:`,
+      error
+    );
+    // Fallback to mock data if API fails
+    console.log("Falling back to mock data");
+    const movie = mockPublicMovies.find(
+      (m) => m.movieId.toString() === movieId.toString()
+    );
+    return movie ? JSON.parse(JSON.stringify(movie)) : null;
+  }
 };
 
 // --- Admin Specific (Using Live API) ---

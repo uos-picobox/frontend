@@ -17,6 +17,7 @@ import HomePage from "./pages/HomePage";
 import MovieListPage from "./pages/MovieListPage";
 import MovieDetailPage from "./pages/MovieDetailPage";
 import BookingPage from "./pages/BookingPage";
+import BookingSelectPage from "./pages/BookingSelectPage";
 import ProfilePage from "./pages/ProfilePage";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
@@ -107,10 +108,10 @@ function App() {
           <Route path="/movies" element={<MovieListPage />} />
           <Route path="/movies/:movieId" element={<MovieDetailPage />} />
 
+          {/* BookingSelectPage - Shows all movies for booking selection */}
+          <Route path="/booking" element={<BookingSelectPage />} />
           {/* BookingPage will get movieId from URL param */}
           <Route path="/booking/:movieId" element={<BookingPage />} />
-          {/* Fallback if someone tries to go to /booking without movieId */}
-          <Route path="/booking" element={<Navigate to="/" replace />} />
 
           <Route
             path="/profile"
