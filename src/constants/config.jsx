@@ -1,6 +1,10 @@
 // src/constants/config.js
 
-export const API_BASE_URL = "";
+// 환경에 따른 API URL 설정
+export const API_BASE_URL =
+  process.env.NODE_ENV === "production"
+    ? "" // 프로덕션에서는 vercel.json의 rewrite를 사용
+    : ""; // 개발환경에서는 setupProxy.js 사용
 
 // --- Admin API Endpoints ---
 // (이전에 제공된 API_ENDPOINTS.ADMIN_... 형태의 엔드포인트들은 여기에 그대로 유지됩니다)
