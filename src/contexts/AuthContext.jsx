@@ -213,36 +213,11 @@ export const AuthProvider = ({ children }) => {
     setIsLoadingAuth(true);
     setAuthError(null);
     try {
-      // 임시 관리자 로그인 로직 (API가 없으므로)
-      if (
-        credentials.username === "admin" &&
-        credentials.password === "password123"
-      ) {
-        // Mock 관리자 응답 생성
-        const mockAdminResponse = {
-          sessionId: "mock_admin_session_" + Date.now(),
-          user: {
-            id: 1,
-            loginId: "admin",
-            username: "admin",
-            name: "시스템 관리자",
-            email: "admin@picobox.com",
-            roles: ["ROLE_ADMIN", "ROLE_USER"],
-            isAdmin: true,
-          },
-        };
-
-        if (handleLoginResponse(mockAdminResponse, true)) {
-          return true;
-        }
-        return false;
-      } else {
-        // 잘못된 크리덴셜
-        setAuthError(
-          "관리자 로그인 실패. 아이디 또는 비밀번호를 확인해주세요."
-        );
-        return false;
+      const response = await authService.adminLogin(credentials);
+      if (handleLoginResponse(response, true)) {
+        return true;
       }
+      return false;
     } catch (error) {
       setAuthError(
         error.message ||
