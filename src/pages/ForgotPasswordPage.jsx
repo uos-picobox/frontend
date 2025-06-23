@@ -117,6 +117,7 @@ const ForgotPasswordPage = () => {
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [repeatPassword, setRepeatPassword] = useState("");
+  const [verificationToken, setVerificationToken] = useState(""); // 인증 완료 후 받은 토큰
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState(""); // 'success' or 'error'
@@ -139,11 +140,21 @@ const ForgotPasswordPage = () => {
 
     setLoading(true);
     try {
-      await authService.requestPasswordResetEmail({ loginId, email });
+      console.log("🔄 비밀번호 재설정 이메일 인증 요청:", { loginId, email });
+      const response = await authService.requestPasswordResetEmail({
+        loginId,
+        email,
+      });
+      console.log("✅ 이메일 인증 요청 성공:", response);
       showMessage("인증코드가 이메일로 전송되었습니다.", "success");
       setStep(2);
     } catch (error) {
-      showMessage(error.message || "인증코드 전송에 실패했습니다.", "error");
+      console.error("❌ 이메일 인증 요청 실패:", error);
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "인증코드 전송에 실패했습니다.";
+      showMessage(errorMessage, "error");
     } finally {
       setLoading(false);
     }
@@ -158,11 +169,27 @@ const ForgotPasswordPage = () => {
 
     setLoading(true);
     try {
-      await authService.verifyPasswordResetEmail({ email, code });
+      console.log("🔄 비밀번호 재설정 인증코드 검증:", { email, code });
+      const response = await authService.verifyPasswordResetEmail({
+        email,
+        code,
+      });
+      console.log("✅ 인증코드 검증 성공:", response);
+
+      // 서버에서 반환한 새로운 코드를 사용해야 함
+      const newCode = response?.code || response?.data?.code || code;
+      console.log("🔑 비밀번호 재설정에 사용할 코드:", newCode);
+      setVerificationToken(newCode); // 서버에서 반환한 새로운 코드 사용
+
       showMessage("인증이 완료되었습니다.", "success");
       setStep(3);
     } catch (error) {
-      showMessage(error.message || "인증코드가 올바르지 않습니다.", "error");
+      console.error("❌ 인증코드 검증 실패:", error);
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "잘못된 인증 코드이거나 이미 만료된 코드입니다.";
+      showMessage(errorMessage, "error");
     } finally {
       setLoading(false);
     }
@@ -187,13 +214,45 @@ const ForgotPasswordPage = () => {
 
     setLoading(true);
     try {
-      await authService.resetPassword({ code, password, repeatPassword });
+      // API 명세서에 따르면 code 파라미터를 사용해야 함
+      const resetData = {
+        code: verificationToken || code, // 인증 후 받은 토큰 또는 원본 코드 사용
+        password,
+        repeatPassword,
+      };
+
+      console.log("🔄 비밀번호 재설정 요청:", {
+        code: resetData.code,
+        password: "***",
+        repeatPassword: "***",
+      });
+
+      const response = await authService.resetPassword(resetData);
+      console.log("✅ 비밀번호 재설정 성공:", response);
       showMessage("비밀번호가 성공적으로 변경되었습니다.", "success");
       setTimeout(() => {
         navigate("/login");
       }, 2000);
     } catch (error) {
-      showMessage(error.message || "비밀번호 변경에 실패했습니다.", "error");
+      console.error("❌ 비밀번호 재설정 실패:", error);
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "비밀번호 변경에 실패했습니다.";
+
+      // 인증코드 관련 오류인 경우 2단계로 돌아가기
+      if (
+        errorMessage.includes("인증") ||
+        errorMessage.includes("코드") ||
+        errorMessage.includes("만료")
+      ) {
+        showMessage(errorMessage + " 인증코드를 다시 입력해주세요.", "error");
+        setStep(2);
+        setCode(""); // 코드 입력란 초기화
+        setVerificationToken(""); // 토큰 초기화
+      } else {
+        showMessage(errorMessage, "error");
+      }
     } finally {
       setLoading(false);
     }
@@ -345,9 +404,28 @@ const ForgotPasswordPage = () => {
             placeholder="비밀번호를 다시 입력하세요"
             required
           />
-          <Button type="submit" variant="primary" fullWidth disabled={loading}>
-            {loading ? "비밀번호 변경 중..." : "비밀번호 변경"}
-          </Button>
+          <div style={{ display: "flex", gap: "0.5rem" }}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setStep(2);
+                setPassword("");
+                setRepeatPassword("");
+              }}
+              disabled={loading}
+            >
+              이전
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              fullWidth
+              disabled={loading}
+            >
+              {loading ? "비밀번호 변경 중..." : "비밀번호 변경"}
+            </Button>
+          </div>
         </Form>
       )}
 

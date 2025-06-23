@@ -30,6 +30,7 @@ import PriceSettingForm from "../components/admin/PriceSettingForm";
 import AdminReviewsList from "../components/admin/AdminReviewsList";
 import AddDiscountForm from "../components/admin/AddDiscountForm";
 import AdminCustomersList from "../components/admin/AdminCustomersList";
+import AdminDeleteAccountPage from "./AdminDeleteAccountPage";
 
 // Services
 import * as movieService from "../services/movieService";
@@ -1336,6 +1337,9 @@ const AdminDashboardPage = () => {
             <Route path="reviews/*" element={<ReviewsAdmin />} />
             <Route path="discounts/*" element={<DiscountsAdmin />} />
             <Route path="customers/*" element={<CustomersAdmin />} />
+
+            {/* 관리자 계정 관리 */}
+            <Route path="delete-account" element={<AdminDeleteAccountPage />} />
 
             <Route
               path="*"

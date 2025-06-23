@@ -330,9 +330,9 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await authService.checkEmailAvailability(email);
       if (response) {
-        return { isAvailable: true, message: "사용 가능한 아이디입니다." };
+        return { isAvailable: true, message: "사용 가능한 이메일입니다." };
       } else {
-        return { isAvailable: false, message: "이미 사용 중인 아이디입니다." };
+        return { isAvailable: false, message: "이미 사용 중인 이메일입니다." };
       }
     } catch (error) {
       console.error("이메일 중복 확인 오류:", error);

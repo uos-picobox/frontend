@@ -163,11 +163,21 @@ const FindLoginIdPage = () => {
 
     setLoading(true);
     try {
-      await authService.requestFindLoginIdEmail({ name, email });
+      console.log("🔄 아이디 찾기 이메일 인증 요청:", { name, email });
+      const response = await authService.requestFindLoginIdEmail({
+        name,
+        email,
+      });
+      console.log("✅ 이메일 인증 요청 성공:", response);
       showMessage("인증코드가 이메일로 전송되었습니다.", "success");
       setStep(2);
     } catch (error) {
-      showMessage(error.message || "인증코드 전송에 실패했습니다.", "error");
+      console.error("❌ 이메일 인증 요청 실패:", error);
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "인증코드 전송에 실패했습니다.";
+      showMessage(errorMessage, "error");
     } finally {
       setLoading(false);
     }
@@ -182,18 +192,28 @@ const FindLoginIdPage = () => {
 
     setLoading(true);
     try {
+      console.log("🔄 아이디 찾기 인증코드 검증:", { email, code });
       const response = await authService.verifyFindLoginIdEmail({
         email,
         code,
       });
+      console.log("✅ 인증코드 검증 성공:", response);
       // API 응답에서 찾은 아이디를 추출 (실제 응답 구조에 따라 조정 필요)
       const loginId =
-        response.loginId || response.data?.loginId || "찾은 아이디";
+        response.loginId ||
+        response.data?.loginId ||
+        response.result?.loginId ||
+        "찾은 아이디";
       setFoundLoginId(loginId);
       showMessage("아이디를 찾았습니다!", "success");
       setStep(3);
     } catch (error) {
-      showMessage(error.message || "인증에 실패했습니다.", "error");
+      console.error("❌ 인증코드 검증 실패:", error);
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "잘못된 인증 코드이거나 이미 만료된 코드입니다.";
+      showMessage(errorMessage, "error");
     } finally {
       setLoading(false);
     }
