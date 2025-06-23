@@ -11,6 +11,7 @@ import {
 
 import Header from "./components/layout/Header";
 import Footer from "./components/layout/Footer";
+import SearchModal from "./components/common/SearchModal";
 
 // Page Components
 import HomePage from "./pages/HomePage";
@@ -27,7 +28,6 @@ import FindLoginIdPage from "./pages/FindLoginIdPage";
 import AdminLoginPage from "./pages/AdminLoginPage";
 import AdminSignupPage from "./pages/AdminSignupPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
-import GuestLoginPage from "./pages/GuestLoginPage";
 import PaymentSuccessPage from "./pages/PaymentSuccessPage";
 import PaymentFailPage from "./pages/PaymentFailPage";
 import NotFoundPage from "./pages/NotFoundPage";
@@ -101,6 +101,7 @@ function App() {
   const { sessionId, isAdmin, user, logout: authLogout } = useAuth();
   // selectedMovie state is removed. Movie ID will be passed via URL params.
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const navigate = useNavigate(); // React Router's navigate function
   const location = useLocation(); // To get current path for Header
 
@@ -120,6 +121,9 @@ function App() {
     navigate("/"); // Redirect to home after user logout
   };
 
+  const openSearchModal = () => setIsSearchModalOpen(true);
+  const closeSearchModal = () => setIsSearchModalOpen(false);
+
   // The `MapsTo` prop in Header and other components will now use React Router's Link or navigate
 
   return (
@@ -131,6 +135,7 @@ function App() {
         isUserLoggedIn={!!sessionId && !!user && !isAdmin}
         handleAdminLogout={handleAdminLogout}
         handleUserLogout={handleUserLogout}
+        onSearchClick={openSearchModal}
         // No need for currentPage, selectedMovie, movies here if NavLinks use <NavLink>
       />
       <MainContent className="main-content-area">
@@ -155,7 +160,6 @@ function App() {
           />
 
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/guest/login" element={<GuestLoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/find-login-id" element={<FindLoginIdPage />} />
@@ -180,6 +184,9 @@ function App() {
         </Routes>
       </MainContent>
       <Footer />
+
+      {/* 검색 모달 - 전체 화면에 표시 */}
+      <SearchModal isOpen={isSearchModalOpen} onClose={closeSearchModal} />
     </AppContainer>
   );
 }

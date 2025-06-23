@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import styled from "styled-components";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { CheckCircle } from "lucide-react";
@@ -88,9 +88,19 @@ const PaymentSuccessPage = () => {
   const [isConfirming, setIsConfirming] = useState(true);
   const [confirmationError, setConfirmationError] = useState(null);
   const [paymentInfo, setPaymentInfo] = useState(null);
+  const hasConfirmedPayment = useRef(false);
 
   useEffect(() => {
     const confirmPayment = async () => {
+      // 이미 결제 확인을 진행했다면 중복 실행 방지
+      if (hasConfirmedPayment.current) {
+        console.log("Payment confirmation already processed, skipping...");
+        return;
+      }
+
+      // 결제 확인 진행 중으로 표시
+      hasConfirmedPayment.current = true;
+
       const orderId = searchParams.get("orderId");
       const paymentKey = searchParams.get("paymentKey");
       const amount = parseInt(searchParams.get("amount"));
@@ -332,7 +342,7 @@ const PaymentSuccessPage = () => {
     };
 
     confirmPayment();
-  }, [searchParams, navigate]);
+  }, []); // 빈 의존성 배열로 변경하여 컴포넌트 마운트 시 한 번만 실행
 
   const handleGoToProfile = () => {
     navigate("/profile");

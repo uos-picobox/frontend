@@ -2,7 +2,19 @@
 import React from "react";
 import styled, { css } from "styled-components";
 
-const StyledButton = styled.button`
+const StyledButton = styled.button.withConfig({
+  shouldForwardProp: (prop, defaultValidatorFn) => {
+    // 커스텀 props는 DOM에 전달하지 않음
+    const customProps = ["variant", "size", "fullWidth", "hasText"];
+    if (customProps.includes(prop)) {
+      return false;
+    }
+    // 기본 HTML 속성들은 전달 (defaultValidatorFn이 함수인 경우에만 사용)
+    return typeof defaultValidatorFn === "function"
+      ? defaultValidatorFn(prop)
+      : true;
+  },
+})`
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -80,7 +92,7 @@ const StyledButton = styled.button`
           background-color: ${theme.colors.error};
           color: ${theme.colors.white};
           &:hover:not(:disabled) {
-            background-color: darken(${theme.colors.error}, 0.1);
+            background-color: #dc2626; /* red-600 for darker hover */
           }
         `;
       case "text": // For icon buttons or simple text buttons

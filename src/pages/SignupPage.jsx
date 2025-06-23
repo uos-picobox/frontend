@@ -508,8 +508,8 @@ const SignupPage = () => {
             disabled={isLoadingAuth}
           >
             <option value="">선택안함</option>
-            <option value="Male">남성</option>
-            <option value="Female">여성</option>
+            <option value="MALE">남성</option>
+            <option value="FEMALE">여성</option>
           </Input>
         </Grid>
 

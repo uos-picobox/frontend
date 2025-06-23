@@ -1,7 +1,7 @@
 // src/components/layout/Header.js
 import React from "react";
 import styled from "styled-components";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
   Search,
   Menu,
@@ -167,9 +167,8 @@ const Header = ({
   isUserLoggedIn,
   handleAdminLogout,
   handleUserLogout,
+  onSearchClick,
 }) => {
-  const navigate = useNavigate();
-
   const toggleMobileMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
 
@@ -191,10 +190,7 @@ const Header = ({
         </DesktopNav>
 
         <ActionButtonsContainer>
-          <IconButton
-            title="Search"
-            onClick={() => alert("검색 기능은 준비 중입니다.")}
-          >
+          <IconButton title="검색" onClick={onSearchClick}>
             <Search />
           </IconButton>
 

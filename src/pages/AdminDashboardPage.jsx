@@ -26,6 +26,11 @@ import AddDistributorForm from "../components/admin/AddDistributorForm";
 import AddTicketTypeForm from "../components/admin/AddTicketTypeForm";
 import PriceSettingForm from "../components/admin/PriceSettingForm";
 
+// New admin components
+import AdminReviewsList from "../components/admin/AdminReviewsList";
+import AddDiscountForm from "../components/admin/AddDiscountForm";
+import AdminCustomersList from "../components/admin/AdminCustomersList";
+
 // Services
 import * as movieService from "../services/movieService";
 import * as actorService from "../services/actorService";
@@ -36,6 +41,8 @@ import * as ratingService from "../services/ratingService";
 import * as distributorService from "../services/distributorService";
 import * as ticketTypeService from "../services/ticketTypeService";
 import * as priceService from "../services/priceService";
+import * as adminDiscountService from "../services/adminDiscountService";
+import * as paymentService from "../services/paymentService";
 
 import { useData } from "../contexts/DataContext";
 
@@ -679,6 +686,142 @@ const TicketTypesAdmin = () => (
   </Routes>
 );
 
+// 리뷰 관리 컴포넌트
+const ReviewsAdmin = () => (
+  <Routes>
+    <Route path="/" element={<AdminReviewsList />} />
+  </Routes>
+);
+
+// 할인 관리 컴포넌트
+const DiscountsAdmin = () => {
+  const [discounts, setDiscounts] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [showForm, setShowForm] = useState(false);
+  const [editingDiscount, setEditingDiscount] = useState(null);
+  const [discountToDelete, setDiscountToDelete] = useState(null);
+
+  // 할인 목록을 가져오는 함수 (고객용 할인 목록 API 활용)
+  const fetchDiscounts = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await paymentService.getDiscountList();
+      setDiscounts(data || []);
+    } catch (err) {
+      setError("할인 목록을 불러오는데 실패했습니다: " + err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDiscounts();
+  }, [fetchDiscounts]);
+
+  const handleAddDiscount = async (discountData) => {
+    try {
+      await adminDiscountService.registerDiscount(discountData);
+      alert("할인 정보가 성공적으로 추가되었습니다.");
+      setShowForm(false);
+      fetchDiscounts();
+    } catch (err) {
+      throw new Error(err.message || "할인 정보 추가에 실패했습니다.");
+    }
+  };
+
+  const handleEditDiscount = async (discountData) => {
+    try {
+      await adminDiscountService.updateDiscount(discountData);
+      alert("할인 정보가 성공적으로 수정되었습니다.");
+      setEditingDiscount(null);
+      setShowForm(false);
+      fetchDiscounts();
+    } catch (err) {
+      throw new Error(err.message || "할인 정보 수정에 실패했습니다.");
+    }
+  };
+
+  const handleDeleteDiscount = async () => {
+    if (!discountToDelete) return;
+    try {
+      // 할인 정보의 ID 필드명을 확인하여 사용 (paymentDiscountId 또는 id)
+      const discountId =
+        discountToDelete.paymentDiscountId || discountToDelete.id;
+      await adminDiscountService.deleteDiscount(discountId);
+      alert("할인 정보가 성공적으로 삭제되었습니다.");
+      setDiscountToDelete(null);
+      fetchDiscounts();
+    } catch (err) {
+      alert("할인 정보 삭제에 실패했습니다: " + err.message);
+    }
+  };
+
+  if (showForm) {
+    return (
+      <AddDiscountForm
+        onSubmit={editingDiscount ? handleEditDiscount : handleAddDiscount}
+        initialData={editingDiscount}
+        onCancel={() => {
+          setShowForm(false);
+          setEditingDiscount(null);
+        }}
+      />
+    );
+  }
+
+  return (
+    <>
+      <ViewItemsList
+        title="할인 관리"
+        items={discounts}
+        isLoading={isLoading}
+        error={error}
+        renderItem={(item) => (
+          <>
+            <strong>{item.providerName}</strong>
+            <span className="detail">
+              {item.discountRate > 0 && `${item.discountRate}% 할인`}
+              {item.discountAmount > 0 &&
+                `${item.discountAmount.toLocaleString()}원 할인`}
+              {item.description && ` - ${item.description}`}
+            </span>
+          </>
+        )}
+        onAddItem={() => setShowForm(true)}
+        addItemLabel="새 할인 추가"
+        onEdit={(item) => {
+          // ID 필드를 통일하여 전달 (paymentDiscountId가 우선)
+          const editItem = {
+            ...item,
+            id: item.paymentDiscountId || item.id,
+          };
+          console.log("Edit discount item:", editItem);
+          setEditingDiscount(editItem);
+          setShowForm(true);
+        }}
+        onDelete={(item) => setDiscountToDelete(item)}
+      />
+      <DeleteConfirmationModal
+        isOpen={!!discountToDelete}
+        onClose={() => setDiscountToDelete(null)}
+        onConfirm={handleDeleteDiscount}
+        itemName={
+          discountToDelete?.providerName || discountToDelete?.description
+        }
+      />
+    </>
+  );
+};
+
+// 고객 관리 컴포넌트
+const CustomersAdmin = () => (
+  <Routes>
+    <Route path="/" element={<AdminCustomersList />} />
+  </Routes>
+);
+
 const ItemListContainer = ({
   title,
   fetchFunction,
@@ -1188,6 +1331,11 @@ const AdminDashboardPage = () => {
                 />
               }
             />
+
+            {/* 새로운 관리 기능 라우트들 */}
+            <Route path="reviews/*" element={<ReviewsAdmin />} />
+            <Route path="discounts/*" element={<DiscountsAdmin />} />
+            <Route path="customers/*" element={<CustomersAdmin />} />
 
             <Route
               path="*"

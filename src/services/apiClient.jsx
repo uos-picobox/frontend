@@ -4,10 +4,12 @@ import { API_BASE_URL } from "../constants/config";
 const getSessionId = () => {
   const sessionId = localStorage.getItem("sessionId");
   if (process.env.NODE_ENV === "development") {
-    console.log(
-      "apiClient: getSessionId() returning:",
-      sessionId ? `${sessionId.substring(0, 10)}...` : null
-    );
+    console.log("apiClient: getSessionId() - localStorage contents:", {
+      sessionId: sessionId ? `${sessionId.substring(0, 10)}...` : null,
+      adminData: localStorage.getItem("adminData") ? "exists" : null,
+      userData: localStorage.getItem("userData") ? "exists" : null,
+      allKeys: Object.keys(localStorage),
+    });
   }
   return sessionId;
 };
@@ -130,14 +132,9 @@ const apiClient = {
       // 'Content-Type': 'application/json', // Not needed for GET usually
     };
 
-    // 여러 인증 방식으로 헤더 설정
+    // 백엔드에서 기대하는 Authorization 헤더 형식으로 설정
     if (sessionId) {
-      // 1. Authorization Bearer 헤더 (가장 일반적)
-      headers["Authorization"] = `${sessionId}`;
-      // 2. 커스텀 sessionId 헤더 (기존 방식 유지)
-      headers["sessionId"] = sessionId;
-      // 3. X-Session-ID 헤더 (일부 백엔드에서 사용)
-      headers["X-Session-ID"] = sessionId;
+      headers["Authorization"] = sessionId; // sessionId를 그대로 Authorization 헤더에 설정
     } else {
       console.warn("apiClient GET: No sessionId found for endpoint:", endpoint);
     }
@@ -182,14 +179,9 @@ const apiClient = {
     const sessionId = getSessionId();
     const headers = {};
 
-    // 여러 인증 방식으로 헤더 설정
+    // 백엔드에서 기대하는 Authorization 헤더 형식으로 설정
     if (sessionId) {
-      // 1. Authorization Bearer 헤더 (가장 일반적)
-      headers["Authorization"] = `${sessionId}`;
-      // 2. 커스텀 sessionId 헤더 (기존 방식 유지)
-      headers["sessionId"] = sessionId;
-      // 3. X-Session-ID 헤더 (일부 백엔드에서 사용)
-      headers["X-Session-ID"] = sessionId;
+      headers["Authorization"] = sessionId; // sessionId를 그대로 Authorization 헤더에 설정
     }
 
     let body;
@@ -230,14 +222,9 @@ const apiClient = {
     const sessionId = getSessionId();
     const headers = {};
 
-    // 여러 인증 방식으로 헤더 설정
+    // 백엔드에서 기대하는 Authorization 헤더 형식으로 설정
     if (sessionId) {
-      // 1. Authorization Bearer 헤더 (가장 일반적)
-      headers["Authorization"] = `${sessionId}`;
-      // 2. 커스텀 sessionId 헤더 (기존 방식 유지)
-      headers["sessionId"] = sessionId;
-      // 3. X-Session-ID 헤더 (일부 백엔드에서 사용)
-      headers["X-Session-ID"] = sessionId;
+      headers["Authorization"] = sessionId; // sessionId를 그대로 Authorization 헤더에 설정
     }
 
     let body;
@@ -257,6 +244,48 @@ const apiClient = {
     return handleResponse(response);
   },
 
+  patch: async (endpoint, data, isFormData = false) => {
+    const sessionId = getSessionId();
+    const headers = {};
+
+    // 백엔드에서 기대하는 Authorization 헤더 형식으로 설정
+    if (sessionId) {
+      headers["Authorization"] = sessionId; // sessionId를 그대로 Authorization 헤더에 설정
+    }
+
+    let body;
+    if (isFormData) {
+      body = data; // data is FormData
+    } else {
+      headers["Content-Type"] = "application/json";
+      body = JSON.stringify(data);
+    }
+
+    console.log("apiClient PATCH:", {
+      url: `${API_BASE_URL}${endpoint}`,
+      headers: headers,
+      data: data,
+      isFormData: isFormData,
+      bodyPreview: isFormData ? "[FormData]" : body,
+    });
+
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: "PATCH",
+      headers,
+      body,
+      credentials: "include", // 쿠키 포함
+    });
+
+    console.log("apiClient PATCH response:", {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      url: `${API_BASE_URL}${endpoint}`,
+    });
+
+    return handleResponse(response);
+  },
+
   delete: async (endpoint, data = null) => {
     // DELETE can sometimes have a body for multiple deletions, though rare
     const sessionId = getSessionId();
@@ -264,14 +293,9 @@ const apiClient = {
       // 'Content-Type': 'application/json', // Only if body is present and JSON
     };
 
-    // 여러 인증 방식으로 헤더 설정
+    // 백엔드에서 기대하는 Authorization 헤더 형식으로 설정
     if (sessionId) {
-      // 1. Authorization Bearer 헤더 (가장 일반적)
-      headers["Authorization"] = `${sessionId}`;
-      // 2. 커스텀 sessionId 헤더 (기존 방식 유지)
-      headers["sessionId"] = sessionId;
-      // 3. X-Session-ID 헤더 (일부 백엔드에서 사용)
-      headers["X-Session-ID"] = sessionId;
+      headers["Authorization"] = sessionId; // sessionId를 그대로 Authorization 헤더에 설정
     }
 
     const config = {

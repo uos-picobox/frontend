@@ -54,7 +54,7 @@ const AdminLoginPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     clearAuthError();
-    const success = await adminLogin({ username: loginId, password });
+    const success = await adminLogin({ loginId, password });
     if (success) {
       navigate(from, { replace: true });
     }

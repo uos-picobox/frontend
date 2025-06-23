@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import styled from "styled-components";
 import { useParams, useNavigate } from "react-router-dom";
 import MovieDetailsDisplay from "../components/movie/MovieDetailsDisplay";
+import ReviewSection from "../components/movie/ReviewSection";
 import Button from "../components/common/Button";
 import * as movieService from "../services/movieService";
 import * as screeningService from "../services/screeningService"; // Ensure this is correct path
@@ -179,7 +180,15 @@ const MovieDetailPage = () => {
 
         <ShowtimesSection>
           <ShowtimesTitle>
-            상영 시간표 (오늘: {formatDate(getTodayDateString())})
+            상영 시간표 (오늘:{" "}
+            {(() => {
+              const today = getTodayDateString();
+              console.log("MovieDetailPage - getTodayDateString():", today);
+              const formatted = formatDate(today);
+              console.log("MovieDetailPage - formatDate result:", formatted);
+              return formatted;
+            })()}
+            )
           </ShowtimesTitle>
           {sortedScreeningsToday.length > 0 ? (
             <ShowtimesGrid>
@@ -232,6 +241,11 @@ const MovieDetailPage = () => {
             예매하기
           </Button>
         </BookNowButtonContainer>
+
+        <ReviewSection
+          movieId={movieDetails.movieId}
+          movieTitle={movieDetails.title}
+        />
       </ContentContainer>
     </DetailPageWrapper>
   );

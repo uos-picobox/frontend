@@ -83,6 +83,30 @@ export const API_ENDPOINTS_ADMIN = {
   PRICE_SETTING_SET: `/api/admin/price-settings/set`,
   PRICE_SETTING_DELETE: (roomId, ticketTypeId) =>
     `/api/admin/price-settings/delete?roomId=${roomId}&ticketTypeId=${ticketTypeId}`,
+
+  // Admin Review Management
+  ADMIN_REVIEWS_GET_ALL: `/api/admin/reviews`,
+  ADMIN_REVIEW_GET_BY_ID: (reviewId) => `/api/admin/reviews/${reviewId}`,
+  ADMIN_REVIEW_DELETE: (reviewId) => `/api/admin/reviews/${reviewId}`,
+  ADMIN_REVIEWS_BY_MOVIE: (movieId) => `/api/admin/reviews/movie/${movieId}`,
+  ADMIN_REVIEWS_BY_CUSTOMER: (customerId) =>
+    `/api/admin/reviews/customer/${customerId}`,
+
+  // Admin Payment Discount Management
+  ADMIN_PAYMENT_DISCOUNT_DELETE: (paymentDiscountId) =>
+    `/api/admin/payment-discount/delete/${paymentDiscountId}`,
+  ADMIN_PAYMENT_DISCOUNT_REGISTER: `/api/admin/payment-discount/register`,
+  ADMIN_PAYMENT_DISCOUNT_UPDATE: `/api/admin/payment-discount/update`,
+
+  // Admin Customer Management
+  ADMIN_CUSTOMERS_GET_ALL: `/api/admin/customers`,
+  ADMIN_CUSTOMER_GET_BY_ID: (customerId) =>
+    `/api/admin/customers/${customerId}`,
+  ADMIN_CUSTOMERS_SEARCH_BY_NAME: `/api/admin/customers/search/name`,
+  ADMIN_CUSTOMERS_SEARCH_BY_LOGIN_ID: `/api/admin/customers/search/login-id`,
+  ADMIN_CUSTOMERS_SEARCH_BY_EMAIL: `/api/admin/customers/search/email`,
+  ADMIN_CUSTOMER_STATUS_UPDATE: (customerId) =>
+    `/api/admin/customers/${customerId}/status`,
 };
 
 export const API_ENDPOINTS_CUSTOMER = {
@@ -92,6 +116,9 @@ export const API_ENDPOINTS_CUSTOMER = {
 
   // Public Actor API
   ACTOR_GET_BY_ID: (actorId) => `/api/actors/get/${actorId}`,
+
+  // Search API
+  SEARCH: `/api/search`,
 
   // New Screening APIs
   SCREENINGS_GET_BY_DATE: (date) => `/api/screenings?date=${date}`,
@@ -120,10 +147,19 @@ export const API_ENDPOINTS_CUSTOMER = {
 
   // Payment APIs
   PAYMENT_HISTORY: `/api/protected/payment/get`, // 특정 예약의 결제 정보 (reservationId 필수)
-  PAYMENT_HISTORY_ALL: `/api/protected/payments/my-payments`, // 전체 결제 내역 (미구현)
+  PAYMENT_HISTORY_ALL: `/api/protected/payment/get/all`, // 전체 결제 내역
   PAYMENT_DISCOUNT_LIST: `/api/payment-discount/get`,
   PAYMENT_BEFORE: `/api/protected/payment/before`,
   PAYMENT_CONFIRM: `/api/protected/payment/confirm`,
+
+  // Review APIs
+  REVIEWS_MY: `/api/protected/reviews/my`,
+  REVIEWS_BY_MOVIE: (movieId) => `/api/reviews/movie/${movieId}`, // Public access
+  REVIEWS_SUMMARY: (movieId) => `/api/reviews/movie/${movieId}/summary`, // Public access
+  REVIEWS_CREATE: `/api/protected/reviews`,
+  REVIEWS_UPDATE: (reviewId) => `/api/protected/reviews/${reviewId}`,
+  REVIEWS_DELETE: (reviewId) => `/api/protected/reviews/${reviewId}`,
+  REVIEWS_LIKE_TOGGLE: (reviewId) => `/api/protected/reviews/${reviewId}/like`,
 
   // Customer Auth APIs
   LOGIN: `/api/signin/customer`,
@@ -139,6 +175,7 @@ export const API_ENDPOINTS_CUSTOMER = {
   // Customer Profile APIs
   GET_MY_INFO: `/api/protected/customer/get`,
   UPDATE_MY_INFO: `/api/protected/customer/update`,
+  DELETE_MY_ACCOUNT: `/api/protected/customer/delete`,
 
   // Password Reset APIs
   FIND_PASSWORD_VERIFY_EMAIL: `/api/customer/find/password/verify/email`,

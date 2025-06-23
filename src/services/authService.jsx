@@ -293,6 +293,14 @@ export const updateMyProfile = async (profileData) => {
   return apiClient.put(API_ENDPOINTS_CUSTOMER.UPDATE_MY_INFO, profileData);
 };
 
+/**
+ * Delete my account (회원 탈퇴)
+ * @returns {Promise<any>}
+ */
+export const deleteMyAccount = async () => {
+  return apiClient.delete(API_ENDPOINTS_CUSTOMER.DELETE_MY_ACCOUNT);
+};
+
 // ===== Password Reset API =====
 /**
  * Request email verification for password reset
