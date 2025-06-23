@@ -1,4 +1,4 @@
-# Repository for aPPLY Front-end
+# Repository for PICOBOX Front-end
 
 - https://picobox.vercel.app/
 

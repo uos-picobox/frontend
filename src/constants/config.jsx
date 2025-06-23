@@ -93,6 +93,9 @@ export const API_ENDPOINTS_CUSTOMER = {
   // Public Actor API
   ACTOR_GET_BY_ID: (actorId) => `/api/actors/get/${actorId}`,
 
+  // Search API
+  SEARCH: `/api/search`,
+
   // New Screening APIs
   SCREENINGS_GET_BY_DATE: (date) => `/api/screenings?date=${date}`,
   SCREENINGS_FOR_MOVIE_DATE: (movieId, date) =>
