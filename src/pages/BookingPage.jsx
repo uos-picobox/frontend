@@ -119,6 +119,78 @@ const LoadingErrorDisplay = styled.p`
     $isError ? theme.colors.error : theme.colors.textLighter};
 `;
 
+const LoginSelectionOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: ${({ theme }) => theme.spacing[4]};
+`;
+
+const LoginSelectionModal = styled.div`
+  background-color: ${({ theme }) => theme.colors.surface};
+  padding: ${({ theme }) => theme.spacing[6]};
+  border-radius: ${({ theme }) => theme.borderRadius.xl};
+  box-shadow: ${({ theme }) => theme.shadows.lg};
+  max-width: 450px;
+  width: 100%;
+  text-align: center;
+`;
+
+const LoginSelectionTitle = styled.h3`
+  font-size: ${({ theme }) => theme.fontSizes.xl};
+  color: ${({ theme }) => theme.colors.primaryLight};
+  margin-bottom: ${({ theme }) => theme.spacing[4]};
+`;
+
+const LoginSelectionText = styled.p`
+  color: ${({ theme }) => theme.colors.textDark};
+  margin-bottom: ${({ theme }) => theme.spacing[6]};
+  font-size: ${({ theme }) => theme.fontSizes.base};
+`;
+
+const LoginButtonsContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing[3]};
+  margin-bottom: ${({ theme }) => theme.spacing[4]};
+`;
+
+const LoginOptionButton = styled(Button)`
+  padding: ${({ theme }) => theme.spacing[3]} ${({ theme }) => theme.spacing[4]};
+  font-size: ${({ theme }) => theme.fontSizes.base};
+
+  &.member {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    color: white;
+
+    &:hover {
+      background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+    }
+  }
+
+  &.guest {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    border: none;
+    color: white;
+
+    &:hover {
+      background: linear-gradient(135deg, #e081e9 0%, #e3475a 100%);
+    }
+  }
+`;
+
+const CancelButton = styled(Button).attrs({ variant: "outline" })`
+  color: ${({ theme }) => theme.colors.textDark};
+`;
+
 const BookingPage = () => {
   const { movieId } = useParams();
   const location = useLocation();
@@ -148,6 +220,10 @@ const BookingPage = () => {
   const [paymentData, setPaymentData] = useState(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
+  // Login selection states
+  const [showLoginSelection, setShowLoginSelection] = useState(false);
+  const [pendingScreening, setPendingScreening] = useState(null);
+
   const [isLoading, setIsLoading] = useState(false);
   const [pageError, setPageError] = useState(null);
 
@@ -176,6 +252,15 @@ const BookingPage = () => {
       setTicketCounts(initialCounts);
     }
   }, [globalTicketTypes]);
+
+  // Handle login completion - set pending screening if user logged in
+  useEffect(() => {
+    if (user && pendingScreening) {
+      setSelectedScreening(pendingScreening);
+      setPendingScreening(null);
+      setShowLoginSelection(false);
+    }
+  }, [user, pendingScreening]);
 
   // Load screenings when movie and date are selected
   useEffect(() => {
@@ -391,29 +476,33 @@ const BookingPage = () => {
     (screening) => {
       // Check if user is logged in when selecting screening
       if (!user) {
-        const confirmLogin = window.confirm(
-          "예매를 진행하시려면 로그인이 필요합니다.\n" +
-            "확인: 회원 로그인\n" +
-            "취소: 비회원 예매 (기능 준비 중)"
-        );
-
-        if (confirmLogin) {
-          navigate("/login", { state: { from: location } });
-          return;
-        } else {
-          // For now, alert that guest booking is not available
-          // In the future, this could redirect to guest booking
-          alert(
-            "비회원 예매 기능은 준비 중입니다. 회원 로그인을 이용해주세요."
-          );
-          navigate("/login", { state: { from: location } });
-          return;
-        }
+        // Show login selection UI instead of simple confirm
+        setPendingScreening(screening);
+        setShowLoginSelection(true);
+        return;
       }
       setSelectedScreening(screening);
     },
-    [user, navigate, location]
+    [user]
   );
+
+  const handleLoginSelection = (loginType) => {
+    setShowLoginSelection(false);
+
+    if (loginType === "member") {
+      navigate("/login", { state: { from: location } });
+    } else if (loginType === "guest") {
+      navigate("/guest/login", { state: { from: location } });
+    } else {
+      // 취소한 경우
+      setPendingScreening(null);
+    }
+  };
+
+  const cancelLoginSelection = () => {
+    setShowLoginSelection(false);
+    setPendingScreening(null);
+  };
 
   const handleTicketCountChange = useCallback(
     (ticketTypeId, delta) => {
@@ -1234,6 +1323,44 @@ const BookingPage = () => {
         {movieDetails?.title || "영화 선택 중..."}
       </MovieTitleSmall>
       <StepContainer>{renderStepContent()}</StepContainer>
+
+      {/* Login Selection Modal */}
+      {showLoginSelection && (
+        <LoginSelectionOverlay onClick={cancelLoginSelection}>
+          <LoginSelectionModal onClick={(e) => e.stopPropagation()}>
+            <LoginSelectionTitle>
+              🎬 예매를 진행하시려면 로그인이 필요합니다
+            </LoginSelectionTitle>
+            <LoginSelectionText>
+              예매 방법을 선택해주세요. 회원 로그인 시 포인트 적립과 예매 내역
+              관리가 가능합니다.
+            </LoginSelectionText>
+            <LoginButtonsContainer>
+              <LoginOptionButton
+                className="member"
+                onClick={() => handleLoginSelection("member")}
+                fullWidth
+              >
+                👤 회원 로그인
+                <br />
+                <small>포인트 적립 • 예매 내역 관리</small>
+              </LoginOptionButton>
+              <LoginOptionButton
+                className="guest"
+                onClick={() => handleLoginSelection("guest")}
+                fullWidth
+              >
+                🚀 비회원 로그인
+                <br />
+                <small>간편 빠른 예매</small>
+              </LoginOptionButton>
+            </LoginButtonsContainer>
+            <CancelButton onClick={cancelLoginSelection} fullWidth>
+              취소
+            </CancelButton>
+          </LoginSelectionModal>
+        </LoginSelectionOverlay>
+      )}
     </BookingPageWrapper>
   );
 };

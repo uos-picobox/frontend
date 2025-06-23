@@ -200,23 +200,62 @@ const ProfilePage = () => {
 
   // Load user's reservations
   useEffect(() => {
-    console.log("ProfilePage useEffect - user:", user, "sessionId:", sessionId);
-
-    if (user) {
+    if (user && sessionId) {
       const loadUserData = async () => {
-        console.log(
-          "ProfilePage: Starting to load user data - user:",
-          !!user,
-          "sessionId:",
-          !!sessionId
-        );
         setReservationsLoading(true);
         setReservationsError(null);
 
         try {
-          // 실제 프로필 정보 로드 (백엔드 API에서 제공)
+          // 실제 프로필 정보를 API에서 로드
           const profileData = await getMyProfile();
-          setActualUserProfile(profileData);
+
+          // API 응답이 빈 문자열이거나 null인 경우 처리
+          if (
+            !profileData ||
+            profileData === "" ||
+            (typeof profileData === "string" && profileData.trim() === "")
+          ) {
+            throw new Error("API에서 빈 프로필 데이터를 반환했습니다.");
+          }
+
+          // 문자열 응답인 경우 JSON 파싱 시도
+          let parsedProfileData = profileData;
+          if (typeof profileData === "string") {
+            try {
+              parsedProfileData = JSON.parse(profileData);
+            } catch (parseError) {
+              throw new Error("API 응답을 파싱할 수 없습니다.");
+            }
+          }
+
+          if (
+            parsedProfileData &&
+            (parsedProfileData.customerId ||
+              parsedProfileData.loginId ||
+              parsedProfileData.id)
+          ) {
+            // API 응답 구조에 따라 프로필 데이터 설정
+            const normalizedProfile = {
+              customerId: parsedProfileData.customerId || parsedProfileData.id,
+              loginId: parsedProfileData.loginId,
+              name: parsedProfileData.name,
+              email: parsedProfileData.email,
+              phone: parsedProfileData.phone,
+              dateOfBirth: parsedProfileData.dateOfBirth,
+              gender: parsedProfileData.gender,
+              points: parsedProfileData.points || 0,
+              registeredAt: parsedProfileData.registeredAt,
+              lastLoginAt: parsedProfileData.lastLoginAt,
+              isActive: parsedProfileData.isActive,
+            };
+            setActualUserProfile(normalizedProfile);
+
+            // 프로필 로드 성공했으므로 에러 메시지 초기화
+            setReservationsError(null);
+          } else {
+            setReservationsError("프로필 정보가 유효하지 않습니다.");
+            setActualUserProfile(null);
+          }
 
           // 프로필 데이터에 예약 내역이 포함되어 있을 수 있음
           if (profileData && profileData.reservations) {
@@ -226,38 +265,45 @@ const ProfilePage = () => {
             try {
               const userReservations =
                 await reservationService.getMyReservations();
-              setReservations(userReservations);
+              setReservations(userReservations || []);
             } catch (reservationError) {
-              console.warn("Reservations API not available:", reservationError);
-              setReservations([]); // 예약 내역이 없거나 API가 없는 경우
+              if (reservationError.status === 404) {
+                setReservations([]); // 예약 내역이 없는 경우
+              } else {
+                setReservationsError("예약 내역을 불러올 수 없습니다.");
+              }
             }
           }
         } catch (error) {
-          console.error("Failed to load user data:", error);
-          // 프로필 로드 실패 시 예약 내역만 시도
           if (error.status === 401) {
-            setReservationsError("로그인이 필요합니다.");
+            setReservationsError("세션이 만료되었습니다. 다시 로그인해주세요.");
+            setActualUserProfile(null);
+          } else if (error.status === 404) {
+            setReservationsError(
+              "프로필 API가 구현되지 않았습니다. 개발자에게 문의하세요."
+            );
+            setActualUserProfile(null);
           } else {
-            // 프로필 API가 실패해도 예약 내역은 별도로 시도
-            try {
-              const userReservations =
-                await reservationService.getMyReservations();
-              setReservations(userReservations);
-            } catch (reservationError) {
-              console.warn(
-                "Failed to load both profile and reservations:",
-                reservationError
+            setReservationsError(
+              "회원 정보를 불러오는데 실패했습니다: " + error.message
+            );
+            setActualUserProfile(null);
+          }
+
+          // 프로필 실패해도 예약 내역은 시도
+          try {
+            const userReservations =
+              await reservationService.getMyReservations();
+            setReservations(userReservations || []);
+          } catch (reservationError) {
+            if (reservationError.status === 500) {
+              setReservationsError(
+                "서비스가 일시적으로 이용불가합니다. 잠시 후 다시 시도해주세요."
               );
-              if (reservationError.status === 500) {
-                setReservationsError(
-                  "서비스가 일시적으로 이용불가합니다. 잠시 후 다시 시도해주세요."
-                );
-              } else if (reservationError.status === 404) {
-                setReservationsError("예매 내역이 없습니다.");
-                setReservations([]);
-              } else {
-                setReservationsError("데이터를 불러오는데 실패했습니다.");
-              }
+            } else if (reservationError.status === 404) {
+              setReservations([]);
+            } else {
+              setReservationsError("데이터를 불러오는데 실패했습니다.");
             }
           }
         } finally {
@@ -269,10 +315,6 @@ const ProfilePage = () => {
           setPointLoading(true);
           setPointError(null);
           try {
-            console.log(
-              "ProfilePage: Loading point data with sessionId:",
-              !!sessionId
-            );
             const [balance, history] = await Promise.allSettled([
               pointService.getPointBalance(),
               pointService.getPointHistory(),
@@ -280,9 +322,27 @@ const ProfilePage = () => {
 
             // Promise.allSettled 결과 처리
             if (balance.status === "fulfilled") {
-              setPointBalance(balance.value || 0);
+              // API 응답 구조에 따라 포인트 값 추출
+              let pointValue = 0;
+              if (balance.value !== null && balance.value !== undefined) {
+                if (typeof balance.value === "object") {
+                  // 객체인 경우 여러 가능한 필드명 체크
+                  pointValue =
+                    balance.value.balance ||
+                    balance.value.points ||
+                    balance.value.point ||
+                    balance.value.amount ||
+                    balance.value.value ||
+                    0;
+                } else if (typeof balance.value === "number") {
+                  pointValue = balance.value;
+                } else {
+                  pointValue = parseInt(balance.value) || 0;
+                }
+              }
+
+              setPointBalance(pointValue);
             } else {
-              console.warn("Failed to load point balance:", balance.reason);
               if (balance.reason?.status === 401) {
                 setPointError(
                   "세션이 만료되었습니다. 페이지를 새로고침하거나 다시 로그인해주세요."
@@ -295,20 +355,15 @@ const ProfilePage = () => {
             if (history.status === "fulfilled") {
               setPointHistory(history.value || []);
             } else {
-              console.warn("Failed to load point history:", history.reason);
               if (
                 history.reason?.status !== 401 &&
                 balance.status === "fulfilled"
               ) {
                 // 잔액은 성공했지만 내역만 실패한 경우
                 setPointHistory([]);
-                console.log(
-                  "Point balance loaded successfully, but history failed"
-                );
               }
             }
           } catch (pointError) {
-            console.warn("Failed to load point data:", pointError);
             if (pointError.status === 401) {
               setPointError(
                 "세션이 만료되었습니다. 페이지를 새로고침하거나 다시 로그인해주세요."
@@ -323,31 +378,22 @@ const ProfilePage = () => {
             setPointLoading(false);
           }
         } else {
-          console.warn("ProfilePage: Skipping point data load - no sessionId");
           setPointError("일부 기능을 사용하려면 페이지를 새로고침해주세요.");
           setPointLoading(false);
         }
 
-        // 결제 내역 로드 (sessionId가 있을 때만)
+        // 결제 내역 로드 (현재 API가 전체 결제 내역을 지원하지 않으므로 스킵)
         if (sessionId) {
           setPaymentLoading(true);
           setPaymentError(null);
           try {
-            console.log(
-              "ProfilePage: Loading payment history with sessionId:",
-              !!sessionId
-            );
-            const paymentData = await paymentService.getPaymentHistory();
+            const paymentData = await paymentService.getAllPaymentHistory();
             setPaymentHistory(paymentData || []);
           } catch (paymentError) {
-            console.warn("Failed to load payment history:", paymentError);
             if (paymentError.status === 401) {
               setPaymentError(
                 "세션이 만료되었습니다. 페이지를 새로고침하거나 다시 로그인해주세요."
               );
-            } else if (paymentError.status === 404) {
-              setPaymentHistory([]);
-              console.log("No payment history found");
             } else {
               setPaymentError("결제 내역을 불러올 수 없습니다.");
             }
@@ -355,21 +401,11 @@ const ProfilePage = () => {
             setPaymentLoading(false);
           }
         } else {
-          console.warn(
-            "ProfilePage: Skipping payment data load - no sessionId"
-          );
           setPaymentError("일부 기능을 사용하려면 페이지를 새로고침해주세요.");
           setPaymentLoading(false);
         }
       };
       loadUserData();
-    } else {
-      console.log(
-        "ProfilePage: Skipping data load - user:",
-        !!user,
-        "sessionId:",
-        !!sessionId
-      );
     }
   }, [user, sessionId, getMyProfile]);
 
@@ -452,9 +488,14 @@ const ProfilePage = () => {
     setSelectedReservationId(null);
   };
 
-  // 더 관대한 조건으로 변경 - user만 있으면 일단 페이지를 보여줌
+  // 실제 프로필 데이터가 있으면 우선 사용, 없으면 AuthContext의 user 데이터 사용
+  const profileToDisplay = actualUserProfile || user;
+
+  const { name, loginId, email, phone, dateOfBirth, gender } =
+    profileToDisplay || {};
+
+  // 사용자가 없는 경우 로그인 페이지로 리다이렉트
   if (!user) {
-    console.log("ProfilePage: No user found, redirecting to login");
     return (
       <ProfilePageWrapper>
         <PageTitle>마이페이지</PageTitle>
@@ -464,14 +505,46 @@ const ProfilePage = () => {
     );
   }
 
-  // sessionId가 없는 경우 경고만 표시하고 페이지는 렌더링
+  // sessionId가 없는 경우 경고 표시하고 페이지는 렌더링
   if (!sessionId) {
-    console.warn("ProfilePage: No sessionId found, some features may not work");
+    return (
+      <ProfilePageWrapper>
+        <PageTitle>마이페이지</PageTitle>
+        <div
+          style={{
+            background: "#fff3cd",
+            border: "1px solid #ffeaa7",
+            borderRadius: "8px",
+            padding: "1rem",
+            marginBottom: "2rem",
+            textAlign: "center",
+          }}
+        >
+          <p style={{ color: "#856404", margin: 0 }}>
+            ⚠️ 세션이 만료되었습니다. 페이지를 새로고침하거나 다시
+            로그인해주세요.
+          </p>
+          <div style={{ marginTop: "1rem" }}>
+            <Button
+              onClick={() => window.location.reload()}
+              variant="outline"
+              size="sm"
+              style={{ marginRight: "0.5rem" }}
+            >
+              새로고침
+            </Button>
+            <Button
+              onClick={() => navigate("/login")}
+              variant="primary"
+              size="sm"
+            >
+              다시 로그인
+            </Button>
+          </div>
+        </div>
+      </ProfilePageWrapper>
+    );
   }
-
-  // 실제 프로필 데이터가 있으면 우선 사용, 없으면 AuthContext의 user 데이터 사용
-  const profileToDisplay = actualUserProfile || user;
-  const { name, loginId, email, phone, dateOfBirth, gender } = profileToDisplay;
 
   const getStatusText = (status) => {
     switch (status) {
@@ -490,56 +563,36 @@ const ProfilePage = () => {
     <ProfilePageWrapper>
       <PageTitle>마이페이지</PageTitle>
 
-      {/* 디버그 정보 (개발 환경에서만 표시) */}
-      {process.env.NODE_ENV === "development" && (
-        <div
-          style={{
-            background: "#f0f0f0",
-            padding: "10px",
-            margin: "10px 0",
-            borderRadius: "5px",
-            fontSize: "12px",
-          }}
-        >
-          <strong>디버그 정보:</strong>
-          <br />
-          User: {user ? "✓" : "✗"} ({user?.loginId || "none"})<br />
-          SessionId: {sessionId ? "✓" : "✗"} (
-          {sessionId ? `${sessionId.substring(0, 10)}...` : "none"})<br />
-          Point Error: {pointError || "none"}
-          <br />
-          Reservations Error: {reservationsError || "none"}
-          <br />
-          <button
-            onClick={() => {
-              console.log("=== 디버그 정보 ===");
-              console.log(
-                "localStorage sessionId:",
-                localStorage.getItem("sessionId")
-              );
-              console.log(
-                "localStorage userData:",
-                localStorage.getItem("userData")
-              );
-              console.log("document.cookie:", document.cookie);
-              console.log("현재 user 상태:", user);
-              console.log("현재 sessionId 상태:", sessionId);
-            }}
-            style={{
-              padding: "2px 6px",
-              fontSize: "10px",
-              marginTop: "5px",
-              cursor: "pointer",
-            }}
-          >
-            콘솔에 상세 정보 출력
-          </button>
-        </div>
-      )}
-
       <ProfileGrid>
         <UserInfoCard>
           <h3>회원 정보</h3>
+
+          {/* API 로드 상태 표시 */}
+          {reservationsLoading && (
+            <div
+              style={{
+                color: "#007bff",
+                marginBottom: "1rem",
+                fontSize: "0.9rem",
+              }}
+            >
+              <span>🔄 프로필 정보를 불러오는 중...</span>
+            </div>
+          )}
+
+          {/* API 에러 표시 */}
+          {reservationsError && (
+            <div
+              style={{
+                color: "#dc3545",
+                marginBottom: "1rem",
+                fontSize: "0.9rem",
+              }}
+            >
+              <span>⚠️ {reservationsError}</span>
+            </div>
+          )}
+
           {profileUpdateError && (
             <div
               style={{ color: "red", marginBottom: "1rem", fontSize: "0.9rem" }}
@@ -547,6 +600,7 @@ const ProfilePage = () => {
               {profileUpdateError}
             </div>
           )}
+
           {!isEditingProfile ? (
             <>
               {name && (
@@ -814,7 +868,10 @@ const ProfilePage = () => {
                     color: "#007bff",
                   }}
                 >
-                  {pointBalance.toLocaleString()} P
+                  {typeof pointBalance === "number"
+                    ? pointBalance.toLocaleString()
+                    : "0"}{" "}
+                  P
                 </p>
                 {pointHistory.length > 0 && (
                   <div style={{ marginTop: "1rem" }}>
@@ -845,7 +902,10 @@ const ProfilePage = () => {
                             }}
                           >
                             {history.amount > 0 ? "+" : ""}
-                            {history.amount}P
+                            {typeof history.amount === "number"
+                              ? history.amount
+                              : "0"}
+                            P
                           </span>
                         </div>
                       ))}

@@ -91,29 +91,77 @@ export const login = async (credentials) => {
       let user;
       try {
         // 로그인 직후 프로필 정보 가져오기
+        console.log("authService: Attempting to fetch profile after login");
         const profileData = await getMyProfile();
-        user = {
-          id: profileData.customerId || profileData.id,
-          loginId: response.loginId,
-          name: profileData.name || response.loginId + "_사용자",
-          email: profileData.email || response.loginId + "@example.com",
-          phone: profileData.phone,
-          dateOfBirth: profileData.dateOfBirth,
-          gender: profileData.gender,
-          roles: ["ROLE_USER"],
-          isAdmin: false,
-        };
+        console.log("authService: Profile data fetched:", profileData);
+        console.log("authService: Profile data type:", typeof profileData);
+
+        // 프로필 데이터 유효성 검사
+        if (
+          !profileData ||
+          profileData === "" ||
+          (typeof profileData === "string" && profileData.trim() === "")
+        ) {
+          throw new Error("Empty profile data received");
+        }
+
+        // 문자열 응답인 경우 JSON 파싱 시도
+        let parsedProfileData = profileData;
+        if (typeof profileData === "string") {
+          try {
+            parsedProfileData = JSON.parse(profileData);
+            console.log(
+              "authService: Parsed string profile response:",
+              parsedProfileData
+            );
+          } catch (parseError) {
+            console.error(
+              "authService: Failed to parse profile string response:",
+              parseError
+            );
+            throw new Error("Failed to parse profile response");
+          }
+        }
+
+        if (
+          parsedProfileData &&
+          (parsedProfileData.customerId ||
+            parsedProfileData.loginId ||
+            parsedProfileData.id)
+        ) {
+          user = {
+            id: parsedProfileData.customerId || parsedProfileData.id,
+            loginId: response.loginId,
+            name: parsedProfileData.name || response.loginId,
+            email: parsedProfileData.email || response.loginId + "@example.com",
+            phone: parsedProfileData.phone,
+            dateOfBirth: parsedProfileData.dateOfBirth,
+            gender: parsedProfileData.gender,
+            points: parsedProfileData.points || 0,
+            roles: ["ROLE_USER"],
+            isAdmin: false,
+          };
+          console.log("authService: User object created from profile:", user);
+        } else {
+          throw new Error("Invalid profile data structure");
+        }
       } catch (profileError) {
-        console.warn("Failed to fetch profile after login:", profileError);
-        // 프로필 가져오기 실패 시 기본 정보 사용
+        console.warn(
+          "authService: Failed to fetch profile after login:",
+          profileError
+        );
+        // 프로필 가져오기 실패 시 최소한의 기본 정보만 사용
+        // 실제 프로필 정보는 ProfilePage에서 다시 시도
         user = {
           id: Math.floor(Math.random() * 1000) + 1, // 임시 ID
           loginId: response.loginId,
-          name: response.loginId + "_사용자",
+          name: response.loginId, // 임시 이름에서 "_사용자" 제거
           email: response.loginId + "@example.com",
           roles: ["ROLE_USER"],
           isAdmin: false,
+          _profileNotLoaded: true, // 프로필이 로드되지 않았음을 표시
         };
+        console.log("authService: User object created with basic info:", user);
       }
 
       localStorage.setItem("userData", JSON.stringify(user));
@@ -221,7 +269,19 @@ export const adminLogout = async () => {
  * @returns {Promise<any>}
  */
 export const getMyProfile = async () => {
-  return apiClient.get(API_ENDPOINTS_CUSTOMER.GET_MY_INFO);
+  console.log(
+    "authService: getMyProfile() called with endpoint:",
+    API_ENDPOINTS_CUSTOMER.GET_MY_INFO
+  );
+  try {
+    const result = await apiClient.get(API_ENDPOINTS_CUSTOMER.GET_MY_INFO);
+    console.log("authService: getMyProfile() result:", result);
+    console.log("authService: getMyProfile() result type:", typeof result);
+    return result;
+  } catch (error) {
+    console.error("authService: getMyProfile() error:", error);
+    throw error;
+  }
 };
 
 /**
@@ -436,4 +496,12 @@ export const verifyGuestAuthMail = async (authMailData) => {
     API_ENDPOINTS_GUEST.SIGNUP_AUTH_EMAIL_CODE,
     authMailData
   );
+};
+
+/**
+ * Delete Admin Account
+ * @returns {Promise<any>}
+ */
+export const deleteAdminAccount = async () => {
+  return apiClient.delete(API_ENDPOINTS_ADMIN_AUTH.DELETE_ACCOUNT);
 };

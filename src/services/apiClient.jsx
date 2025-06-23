@@ -94,12 +94,32 @@ const handleResponse = async (response) => {
     // No Content
     return null;
   }
+
   // Check if response is JSON before trying to parse
   const contentType = response.headers.get("content-type");
   if (contentType && contentType.indexOf("application/json") !== -1) {
-    return response.json();
+    const jsonData = await response.json();
+    console.log("apiClient: JSON response received:", jsonData);
+    return jsonData;
   } else {
-    return response.text(); // Or handle as blob, etc., if needed
+    const textData = await response.text();
+    console.log("apiClient: Text response received:", textData);
+
+    // 텍스트 응답이 빈 문자열인 경우 null 반환
+    if (!textData || textData.trim() === "") {
+      console.warn("apiClient: Empty text response received");
+      return null;
+    }
+
+    // JSON 형태의 문자열인지 확인하고 파싱 시도
+    try {
+      const parsed = JSON.parse(textData);
+      console.log("apiClient: Successfully parsed text as JSON:", parsed);
+      return parsed;
+    } catch (e) {
+      console.log("apiClient: Text response is not JSON, returning as string");
+      return textData;
+    }
   }
 };
 
@@ -113,7 +133,7 @@ const apiClient = {
     // 여러 인증 방식으로 헤더 설정
     if (sessionId) {
       // 1. Authorization Bearer 헤더 (가장 일반적)
-      headers["Authorization"] = `Bearer ${sessionId}`;
+      headers["Authorization"] = `${sessionId}`;
       // 2. 커스텀 sessionId 헤더 (기존 방식 유지)
       headers["sessionId"] = sessionId;
       // 3. X-Session-ID 헤더 (일부 백엔드에서 사용)
@@ -165,7 +185,7 @@ const apiClient = {
     // 여러 인증 방식으로 헤더 설정
     if (sessionId) {
       // 1. Authorization Bearer 헤더 (가장 일반적)
-      headers["Authorization"] = `Bearer ${sessionId}`;
+      headers["Authorization"] = `${sessionId}`;
       // 2. 커스텀 sessionId 헤더 (기존 방식 유지)
       headers["sessionId"] = sessionId;
       // 3. X-Session-ID 헤더 (일부 백엔드에서 사용)
@@ -213,7 +233,7 @@ const apiClient = {
     // 여러 인증 방식으로 헤더 설정
     if (sessionId) {
       // 1. Authorization Bearer 헤더 (가장 일반적)
-      headers["Authorization"] = `Bearer ${sessionId}`;
+      headers["Authorization"] = `${sessionId}`;
       // 2. 커스텀 sessionId 헤더 (기존 방식 유지)
       headers["sessionId"] = sessionId;
       // 3. X-Session-ID 헤더 (일부 백엔드에서 사용)
@@ -247,7 +267,7 @@ const apiClient = {
     // 여러 인증 방식으로 헤더 설정
     if (sessionId) {
       // 1. Authorization Bearer 헤더 (가장 일반적)
-      headers["Authorization"] = `Bearer ${sessionId}`;
+      headers["Authorization"] = `${sessionId}`;
       // 2. 커스텀 sessionId 헤더 (기존 방식 유지)
       headers["sessionId"] = sessionId;
       // 3. X-Session-ID 헤더 (일부 백엔드에서 사용)

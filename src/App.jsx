@@ -27,6 +27,7 @@ import FindLoginIdPage from "./pages/FindLoginIdPage";
 import AdminLoginPage from "./pages/AdminLoginPage";
 import AdminSignupPage from "./pages/AdminSignupPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
+import GuestLoginPage from "./pages/GuestLoginPage";
 import PaymentSuccessPage from "./pages/PaymentSuccessPage";
 import PaymentFailPage from "./pages/PaymentFailPage";
 import NotFoundPage from "./pages/NotFoundPage";
@@ -154,6 +155,7 @@ function App() {
           />
 
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/guest/login" element={<GuestLoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/find-login-id" element={<FindLoginIdPage />} />

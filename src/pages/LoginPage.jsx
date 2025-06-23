@@ -189,6 +189,8 @@ const LoginPage = () => {
         <StyledLink to="/signup">회원가입</StyledLink>
         <br />
         <StyledLink to="/find-login-id">아이디 찾기</StyledLink>
+        <br />
+        <StyledLink to="/guest/login">비회원 로그인</StyledLink>
       </ExtraLinks>
     </LoginPageWrapper>
   );

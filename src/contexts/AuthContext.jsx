@@ -254,6 +254,24 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  const guestLogin = useCallback(async (credentials) => {
+    setIsLoadingAuth(true);
+    setAuthError(null);
+    try {
+      const response = await authService.guestLogin(credentials);
+      if (handleLoginResponse(response, false)) return true;
+      return false;
+    } catch (error) {
+      setAuthError(
+        error.message ||
+          "비회원 로그인 실패. 이메일 또는 비밀번호를 확인해주세요."
+      );
+      return false;
+    } finally {
+      setIsLoadingAuth(false);
+    }
+  }, []);
+
   const signup = useCallback(async (signupData) => {
     setIsLoadingAuth(true);
     setAuthError(null);
@@ -370,6 +388,29 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  const deleteAdminAccount = useCallback(async () => {
+    try {
+      await authService.deleteAdminAccount();
+      // 계정 삭제 후 로그아웃 처리
+      setSessionId(null);
+      setUser(null);
+      setIsAdmin(false);
+      setAuthError(null);
+      // 로컬 스토리지 정리
+      localStorage.removeItem("sessionId");
+      localStorage.removeItem("sessionExpiresAt");
+      localStorage.removeItem("userData");
+      localStorage.removeItem("adminData");
+      // 쿠키 정리
+      document.cookie =
+        "sessionId=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      return true;
+    } catch (error) {
+      console.error("관리자 계정 삭제 오류:", error);
+      throw error;
+    }
+  }, []);
+
   const value = {
     user,
     isAdmin,
@@ -378,6 +419,7 @@ export const AuthProvider = ({ children }) => {
     authError,
     login,
     adminLogin,
+    guestLogin,
     signup,
     logout,
     requestAuthMail,
@@ -386,6 +428,7 @@ export const AuthProvider = ({ children }) => {
     checkEmail,
     getMyProfile,
     updateMyProfile,
+    deleteAdminAccount,
     clearAuthError: useCallback(() => setAuthError(null), []),
   };
 

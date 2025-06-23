@@ -119,7 +119,8 @@ export const API_ENDPOINTS_CUSTOMER = {
   POINT_HISTORY: `/api/protected/get/point-history`,
 
   // Payment APIs
-  PAYMENT_HISTORY: `/api/protected/payment/get`,
+  PAYMENT_HISTORY: `/api/protected/payment/get`, // 특정 예약의 결제 정보 (reservationId 필수)
+  PAYMENT_HISTORY_ALL: `/api/protected/payments/my-payments`, // 전체 결제 내역 (미구현)
   PAYMENT_DISCOUNT_LIST: `/api/payment-discount/get`,
   PAYMENT_BEFORE: `/api/protected/payment/before`,
   PAYMENT_CONFIRM: `/api/protected/payment/confirm`,
@@ -169,6 +170,7 @@ export const API_ENDPOINTS_ADMIN_AUTH = {
   SIGNUP_CHECK_EMAIL: (email) => `/api/signup/admin/check/email?email=${email}`,
   SIGNUP_REQUEST_EMAIL_VERIFICATION: `/api/signup/admin/verify/email`,
   SIGNUP_AUTH_EMAIL_CODE: `/api/signup/admin/auth/email`,
+  DELETE_ACCOUNT: `/api/admin/delete/account`,
 };
 
 // --- UI Constants & Fallbacks ---

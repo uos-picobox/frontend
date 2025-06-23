@@ -220,7 +220,25 @@ const AdminSignupPage = () => {
       const result = await authService.checkAdminLoginIdAvailability(
         formData.loginId
       );
-      setValidationStatus((prev) => ({ ...prev, loginId: result }));
+      if (result && result.isAvailable !== false) {
+        setValidationStatus((prev) => ({
+          ...prev,
+          loginId: {
+            isAvailable: true,
+            message: "사용 가능한 아이디입니다.",
+          },
+        }));
+        showMessage("사용 가능한 아이디입니다.", "success");
+      } else {
+        setValidationStatus((prev) => ({
+          ...prev,
+          loginId: {
+            isAvailable: false,
+            message: "이미 사용 중인 아이디입니다.",
+          },
+        }));
+        showMessage("이미 사용 중인 아이디입니다.", "error");
+      }
     } catch (error) {
       setValidationStatus((prev) => ({
         ...prev,
@@ -229,6 +247,10 @@ const AdminSignupPage = () => {
           message: error.message || "중복 확인 중 오류가 발생했습니다.",
         },
       }));
+      showMessage(
+        error.message || "중복 확인 중 오류가 발생했습니다.",
+        "error"
+      );
     } finally {
       setLoading(false);
     }
@@ -248,7 +270,25 @@ const AdminSignupPage = () => {
       const result = await authService.checkAdminEmailAvailability(
         formData.email
       );
-      setValidationStatus((prev) => ({ ...prev, email: result }));
+      if (result && result.isAvailable !== false) {
+        setValidationStatus((prev) => ({
+          ...prev,
+          email: {
+            isAvailable: true,
+            message: "사용 가능한 이메일입니다.",
+          },
+        }));
+        showMessage("사용 가능한 이메일입니다.", "success");
+      } else {
+        setValidationStatus((prev) => ({
+          ...prev,
+          email: {
+            isAvailable: false,
+            message: "이미 사용 중인 이메일입니다.",
+          },
+        }));
+        showMessage("이미 사용 중인 이메일입니다.", "error");
+      }
     } catch (error) {
       setValidationStatus((prev) => ({
         ...prev,
@@ -257,6 +297,10 @@ const AdminSignupPage = () => {
           message: error.message || "중복 확인 중 오류가 발생했습니다.",
         },
       }));
+      showMessage(
+        error.message || "중복 확인 중 오류가 발생했습니다.",
+        "error"
+      );
     } finally {
       setLoading(false);
     }
