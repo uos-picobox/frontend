@@ -7,6 +7,7 @@ import Button from "../components/common/Button";
 import { formatDate } from "../utils/dateUtils";
 import * as reservationService from "../services/reservationService";
 import * as pointService from "../services/pointService";
+import * as paymentService from "../services/paymentService";
 import ReservationDetailModal from "../components/booking/ReservationDetailModal";
 
 const ProfilePageWrapper = styled.div`
@@ -191,6 +192,9 @@ const ProfilePage = () => {
   const [pointHistory, setPointHistory] = useState([]);
   const [pointLoading, setPointLoading] = useState(false);
   const [pointError, setPointError] = useState(null);
+  const [paymentHistory, setPaymentHistory] = useState([]);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentError, setPaymentError] = useState(null);
   const [selectedReservationId, setSelectedReservationId] = useState(null);
   const [showReservationModal, setShowReservationModal] = useState(false);
 
@@ -322,6 +326,40 @@ const ProfilePage = () => {
           console.warn("ProfilePage: Skipping point data load - no sessionId");
           setPointError("일부 기능을 사용하려면 페이지를 새로고침해주세요.");
           setPointLoading(false);
+        }
+
+        // 결제 내역 로드 (sessionId가 있을 때만)
+        if (sessionId) {
+          setPaymentLoading(true);
+          setPaymentError(null);
+          try {
+            console.log(
+              "ProfilePage: Loading payment history with sessionId:",
+              !!sessionId
+            );
+            const paymentData = await paymentService.getPaymentHistory();
+            setPaymentHistory(paymentData || []);
+          } catch (paymentError) {
+            console.warn("Failed to load payment history:", paymentError);
+            if (paymentError.status === 401) {
+              setPaymentError(
+                "세션이 만료되었습니다. 페이지를 새로고침하거나 다시 로그인해주세요."
+              );
+            } else if (paymentError.status === 404) {
+              setPaymentHistory([]);
+              console.log("No payment history found");
+            } else {
+              setPaymentError("결제 내역을 불러올 수 없습니다.");
+            }
+          } finally {
+            setPaymentLoading(false);
+          }
+        } else {
+          console.warn(
+            "ProfilePage: Skipping payment data load - no sessionId"
+          );
+          setPaymentError("일부 기능을 사용하려면 페이지를 새로고침해주세요.");
+          setPaymentLoading(false);
         }
       };
       loadUserData();
@@ -819,16 +857,88 @@ const ProfilePage = () => {
           </SectionCard>
 
           <SectionCard>
-            <h3>결제 수단 관리</h3>
-            <p>등록된 결제 수단이 없습니다. (구현 예정)</p>
-            <Button
-              variant="outline"
-              size="sm"
-              style={{ marginTop: "0.5rem" }}
-              onClick={() => alert("결제 수단 관리 기능은 준비 중입니다.")}
-            >
-              카드/계좌 등록
-            </Button>
+            <h3>결제 내역</h3>
+            {paymentLoading && <p>결제 내역을 불러오는 중...</p>}
+            {paymentError && (
+              <p style={{ color: "red", fontSize: "0.9rem" }}>{paymentError}</p>
+            )}
+            {!paymentLoading &&
+              !paymentError &&
+              paymentHistory.length === 0 && <p>결제 내역이 없습니다.</p>}
+            {!paymentLoading && !paymentError && paymentHistory.length > 0 && (
+              <div style={{ maxHeight: "200px", overflow: "auto" }}>
+                {paymentHistory.slice(0, 5).map((payment, index) => (
+                  <div
+                    key={payment.paymentId || index}
+                    style={{
+                      padding: "0.75rem",
+                      marginBottom: "0.5rem",
+                      backgroundColor: "#f8f9fa",
+                      borderRadius: "4px",
+                      borderLeft: "3px solid #007bff",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginBottom: "0.5rem",
+                      }}
+                    >
+                      <span style={{ fontWeight: "600", fontSize: "0.9rem" }}>
+                        {payment.orderName || `주문 #${payment.orderId}`}
+                      </span>
+                      <span
+                        style={{
+                          color: "#007bff",
+                          fontWeight: "bold",
+                          fontSize: "0.9rem",
+                        }}
+                      >
+                        {payment.finalAmount?.toLocaleString() ||
+                          payment.amount?.toLocaleString()}
+                        원
+                      </span>
+                    </div>
+                    <div style={{ fontSize: "0.8rem", color: "#666" }}>
+                      <p style={{ margin: "0.25rem 0" }}>
+                        결제수단:{" "}
+                        {payment.paymentMethod === "CARD"
+                          ? "카드"
+                          : payment.paymentMethod === "TRANSFER"
+                          ? "계좌이체"
+                          : payment.paymentMethod === "MOBILE_PHONE"
+                          ? "휴대폰"
+                          : payment.paymentMethod || "카드"}
+                      </p>
+                      <p style={{ margin: "0.25rem 0" }}>
+                        결제일:{" "}
+                        {formatDate(payment.paymentDate || payment.createdAt)}
+                      </p>
+                      {payment.usedPointAmount > 0 && (
+                        <p style={{ margin: "0.25rem 0", color: "#28a745" }}>
+                          포인트 사용:{" "}
+                          {payment.usedPointAmount?.toLocaleString()}P
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {paymentHistory.length > 5 && (
+                  <p
+                    style={{
+                      textAlign: "center",
+                      marginTop: "1rem",
+                      fontSize: "0.9rem",
+                      color: "#666",
+                    }}
+                  >
+                    {paymentHistory.length - 5}개의 결제 내역이 더 있습니다.
+                  </p>
+                )}
+              </div>
+            )}
           </SectionCard>
         </OtherSections>
       </ProfileGrid>

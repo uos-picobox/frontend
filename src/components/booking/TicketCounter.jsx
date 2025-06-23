@@ -97,9 +97,10 @@ const WarningText = styled.p`
  * @param {object} props
  * @param {object} props.ticketCounts - e.g., { 1: 0, 2: 0, 3: 0 } (keys are ticketTypeId)
  * @param {function} props.onTicketCountChange - (ticketTypeId: number, delta: number) => void
- * @param {TicketTypeResponseDto[]} props.ticketTypes - Available ticket types
+ * @param {TicketTypeResponseDto[]|Array} props.ticketTypes - Available ticket types or screening ticket prices
  * @param {number} props.maxTotalTickets - Maximum total tickets allowed (e.g., 8)
  * @param {number} props.selectedSeatsCount - Number of currently selected seats
+ * @param {boolean} props.useActualPrices - Whether to use actual prices from screening data
  */
 const TicketCounter = ({
   ticketCounts,
@@ -107,19 +108,31 @@ const TicketCounter = ({
   ticketTypes,
   maxTotalTickets = 8,
   selectedSeatsCount,
+  useActualPrices = false,
 }) => {
   // Create a combined list of ticket types with their prices for the current context
   const displayableTicketTypes = (ticketTypes || [])
     .map((tt) => {
-      return {
-        id: tt.ticketTypeId,
-        name: tt.typeName,
-        description: tt.description,
-        // Use fallback price based on ticket type name
-        price:
-          TICKET_PRICES_FALLBACK[tt.typeName?.toLowerCase()] ||
-          TICKET_PRICES_FALLBACK.adult,
-      };
+      if (useActualPrices && tt.price) {
+        // Using screening ticket prices (has price property)
+        return {
+          id: tt.ticketTypeId,
+          name: tt.typeName,
+          description: tt.description || "",
+          price: tt.price,
+        };
+      } else {
+        // Using global ticket types (fallback pricing)
+        return {
+          id: tt.ticketTypeId,
+          name: tt.typeName,
+          description: tt.description,
+          // Use fallback price based on ticket type name
+          price:
+            TICKET_PRICES_FALLBACK[tt.typeName?.toLowerCase()] ||
+            TICKET_PRICES_FALLBACK.adult,
+        };
+      }
     })
     .sort((a, b) => a.id - b.id); // Ensure consistent order
 

@@ -98,6 +98,8 @@ export const API_ENDPOINTS_CUSTOMER = {
   SCREENINGS_FOR_MOVIE_DATE: (movieId, date) =>
     `/api/movies/${movieId}/screenings?date=${date}`,
   SCREENING_SEATS_GET: (screeningId) => `/api/screenings/${screeningId}/seats`,
+  SCREENING_TICKET_PRICES: (screeningId) =>
+    `/api/screenings/${screeningId}/ticket-prices`,
 
   // Reservation APIs
   RESERVATIONS_MY: `/api/protected/reservations/my-reservations`,
@@ -115,6 +117,12 @@ export const API_ENDPOINTS_CUSTOMER = {
   // Point APIs
   POINT_BALANCE: `/api/protected/get/point`,
   POINT_HISTORY: `/api/protected/get/point-history`,
+
+  // Payment APIs
+  PAYMENT_HISTORY: `/api/protected/payment/get`,
+  PAYMENT_DISCOUNT_LIST: `/api/payment-discount/get`,
+  PAYMENT_BEFORE: `/api/protected/payment/before`,
+  PAYMENT_CONFIRM: `/api/protected/payment/confirm`,
 
   // Customer Auth APIs
   LOGIN: `/api/signin/customer`,
@@ -173,6 +181,17 @@ export const TICKET_PRICES_FALLBACK = {
 };
 
 export const MAX_SEATS_PER_BOOKING = 8;
+
+// Toss Payments Configuration
+export const TOSS_PAYMENTS_CONFIG = {
+  CLIENT_KEY: "test_ck_26DlbXAaV07qqeZgpLzd3qY50Q9R",
+  get SUCCESS_URL() {
+    return `${window.location.origin}/payment/success`;
+  },
+  get FAIL_URL() {
+    return `${window.location.origin}/payment/fail`;
+  },
+};
 
 export const PLACEHOLDER_POSTER_URL = (
   width = 300,

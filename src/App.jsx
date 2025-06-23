@@ -27,6 +27,8 @@ import FindLoginIdPage from "./pages/FindLoginIdPage";
 import AdminLoginPage from "./pages/AdminLoginPage";
 import AdminSignupPage from "./pages/AdminSignupPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
+import PaymentSuccessPage from "./pages/PaymentSuccessPage";
+import PaymentFailPage from "./pages/PaymentFailPage";
 import NotFoundPage from "./pages/NotFoundPage";
 
 import useAuth from "./hooks/useAuth";
@@ -155,6 +157,10 @@ function App() {
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/find-login-id" element={<FindLoginIdPage />} />
+
+          {/* Payment Routes */}
+          <Route path="/payment/success" element={<PaymentSuccessPage />} />
+          <Route path="/payment/fail" element={<PaymentFailPage />} />
 
           {/* Admin Routes */}
           <Route path="/admin/login" element={<AdminLoginPage />} />

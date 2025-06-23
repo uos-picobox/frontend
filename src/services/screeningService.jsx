@@ -77,6 +77,29 @@ export const getScreeningSeats = async (screeningId) => {
   }
 };
 
+/**
+ * Fetches ticket prices for a specific screening
+ * @param {number|string} screeningId
+ * @returns {Promise<Object>}
+ */
+export const getScreeningTicketPrices = async (screeningId) => {
+  console.log(
+    `screeningService: getScreeningTicketPrices called for screening ${screeningId}`
+  );
+  try {
+    const priceData = await apiClient.get(
+      API_ENDPOINTS_CUSTOMER.SCREENING_TICKET_PRICES(screeningId)
+    );
+    return priceData;
+  } catch (error) {
+    console.error(
+      `screeningService: getScreeningTicketPrices error for screening ${screeningId}:`,
+      error
+    );
+    throw error;
+  }
+};
+
 // --- Admin Specific (Using Live API) ---
 /**
  * Fetches all screenings (Admin).
