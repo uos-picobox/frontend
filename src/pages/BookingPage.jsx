@@ -7,6 +7,7 @@ import TimeSelector from "../components/booking/TimeSelector";
 import TicketCounter from "../components/booking/TicketCounter";
 import SeatLayout from "../components/booking/SeatLayout";
 import Button from "../components/common/Button";
+import Input from "../components/common/Input";
 import PaymentSection from "../components/booking/PaymentSection";
 import { ChevronLeft } from "lucide-react";
 // Toss Payments는 전역 스크립트로 로드됨
@@ -138,9 +139,11 @@ const LoginSelectionModal = styled.div`
   padding: ${({ theme }) => theme.spacing[6]};
   border-radius: ${({ theme }) => theme.borderRadius.xl};
   box-shadow: ${({ theme }) => theme.shadows.lg};
-  max-width: 450px;
+  max-width: 500px;
   width: 100%;
   text-align: center;
+  max-height: 90vh;
+  overflow-y: auto;
 `;
 
 const LoginSelectionTitle = styled.h3`
@@ -191,11 +194,56 @@ const CancelButton = styled(Button).attrs({ variant: "outline" })`
   color: ${({ theme }) => theme.colors.textDark};
 `;
 
+// 비회원 가입 폼 스타일
+const GuestAuthForm = styled.form`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing[4]};
+  text-align: left;
+  margin-top: ${({ theme }) => theme.spacing[4]};
+`;
+
+const FormRow = styled.div`
+  display: flex;
+  gap: ${({ theme }) => theme.spacing[3]};
+
+  & > * {
+    flex: 1;
+  }
+`;
+
+const ErrorMessage = styled.p`
+  color: ${({ theme }) => theme.colors.error};
+  font-size: ${({ theme }) => theme.fontSizes.sm};
+  text-align: center;
+  margin-top: ${({ theme }) => theme.spacing[2]};
+`;
+
+const SuccessMessage = styled.p`
+  color: ${({ theme }) => theme.colors.success || "#10b981"};
+  font-size: ${({ theme }) => theme.fontSizes.sm};
+  text-align: center;
+  margin-top: ${({ theme }) => theme.spacing[2]};
+`;
+
+const EmailVerificationSection = styled.div`
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  padding: ${({ theme }) => theme.spacing[4]};
+  background-color: ${({ theme }) => theme.colors.surfaceLight};
+`;
+
+const VerificationRow = styled.div`
+  display: flex;
+  gap: ${({ theme }) => theme.spacing[2]};
+  align-items: end;
+`;
+
 const BookingPage = () => {
   const { movieId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, guestLogin } = useAuth();
   const { ticketTypes: globalTicketTypes } = useData();
 
   // Seat hold timeout ref
@@ -223,6 +271,23 @@ const BookingPage = () => {
   // Login selection states
   const [showLoginSelection, setShowLoginSelection] = useState(false);
   const [pendingScreening, setPendingScreening] = useState(null);
+  const [loginModalStep, setLoginModalStep] = useState("selection"); // 'selection', 'guest-signup'
+
+  // 비회원 가입 폼 상태
+  const [guestFormData, setGuestFormData] = useState({
+    email: "",
+    password: "",
+    name: "",
+    birthdate: "",
+    phone: "",
+    repeatPassword: "",
+  });
+  const [guestAuthError, setGuestAuthError] = useState("");
+  const [guestAuthSuccess, setGuestAuthSuccess] = useState("");
+  const [isGuestAuthLoading, setIsGuestAuthLoading] = useState(false);
+  const [emailVerificationSent, setEmailVerificationSent] = useState(false);
+  const [emailVerificationCode, setEmailVerificationCode] = useState("");
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
   const [pageError, setPageError] = useState(null);
@@ -365,8 +430,18 @@ const BookingPage = () => {
         console.log("✅ 예매 취소 완료");
         currentReservationRef.current = null;
       } catch (error) {
-        console.warn("예매 취소 실패 (API가 구현되지 않았을 수 있음):", error);
-        // API가 구현되지 않았어도 로컬 상태는 정리
+        console.warn("예매 취소 실패:", error);
+
+        // 409 오류 (이미 완료된 예매 등)는 정상적인 상황일 수 있음
+        if (error.status === 409) {
+          console.warn(
+            "예매 상태로 인해 취소할 수 없습니다 (이미 완료되었을 수 있음)"
+          );
+        } else if (error.status === 404) {
+          console.warn("예매를 찾을 수 없습니다 (이미 처리되었을 수 있음)");
+        }
+
+        // 어떤 오류든 로컬 상태는 정리
         currentReservationRef.current = null;
       }
     },
@@ -414,12 +489,17 @@ const BookingPage = () => {
         clearTimeout(seatHoldTimeoutRef.current);
       }
       if (heldSeatsRef.current.length > 0 && selectedScreening?.screeningId) {
+        // 중복 제거 후 좌석 해제
+        const uniqueHeldSeats = [...new Set(heldSeatsRef.current)];
         reservationService
           .releaseSeats({
             screeningId: selectedScreening.screeningId,
-            seatIds: heldSeatsRef.current,
+            seatIds: uniqueHeldSeats,
           })
-          .catch(console.error);
+          .catch((error) => {
+            console.warn("Failed to release seats on unmount:", error);
+            // 언마운트 시에는 에러가 발생해도 무시
+          });
       }
     };
   }, [selectedScreening]);
@@ -487,21 +567,175 @@ const BookingPage = () => {
   );
 
   const handleLoginSelection = (loginType) => {
-    setShowLoginSelection(false);
-
     if (loginType === "member") {
+      setShowLoginSelection(false);
       navigate("/login", { state: { from: location } });
     } else if (loginType === "guest") {
-      navigate("/guest/login", { state: { from: location } });
+      setLoginModalStep("guest-signup");
+      setGuestFormData({
+        email: "",
+        password: "",
+        name: "",
+        birthdate: "",
+        phone: "",
+        repeatPassword: "",
+      });
+      setGuestAuthError("");
+      setGuestAuthSuccess("");
     } else {
       // 취소한 경우
-      setPendingScreening(null);
+      cancelLoginSelection();
     }
   };
 
   const cancelLoginSelection = () => {
     setShowLoginSelection(false);
     setPendingScreening(null);
+    setLoginModalStep("selection");
+    setGuestFormData({
+      email: "",
+      password: "",
+      name: "",
+      birthdate: "",
+      phone: "",
+      repeatPassword: "",
+    });
+    setGuestAuthError("");
+    setGuestAuthSuccess("");
+    setEmailVerificationSent(false);
+    setEmailVerificationCode("");
+    setIsEmailVerified(false);
+  };
+
+  const handleGuestFormChange = (field, value) => {
+    setGuestFormData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+    setGuestAuthError("");
+  };
+
+  const handleSendEmailVerification = async () => {
+    if (!guestFormData.email) {
+      setGuestAuthError("이메일을 입력해주세요.");
+      return;
+    }
+
+    setIsGuestAuthLoading(true);
+    setGuestAuthError("");
+
+    try {
+      const { requestGuestAuthMail } = await import("../services/authService");
+      await requestGuestAuthMail({
+        email: guestFormData.email,
+        purpose: "비회원 이메일 인증",
+      });
+      setEmailVerificationSent(true);
+      setGuestAuthSuccess("인증 코드가 이메일로 전송되었습니다.");
+    } catch (error) {
+      setGuestAuthError(error.message || "인증 코드 전송에 실패했습니다.");
+    } finally {
+      setIsGuestAuthLoading(false);
+    }
+  };
+
+  const handleVerifyEmailCode = async () => {
+    if (!emailVerificationCode) {
+      setGuestAuthError("인증 코드를 입력해주세요.");
+      return;
+    }
+
+    setIsGuestAuthLoading(true);
+    setGuestAuthError("");
+
+    try {
+      const { verifyGuestAuthMail } = await import("../services/authService");
+      await verifyGuestAuthMail({
+        email: guestFormData.email,
+        code: emailVerificationCode,
+      });
+      setIsEmailVerified(true);
+      setGuestAuthSuccess("이메일 인증이 완료되었습니다.");
+    } catch (error) {
+      setGuestAuthError(error.message || "인증 코드가 올바르지 않습니다.");
+    } finally {
+      setIsGuestAuthLoading(false);
+    }
+  };
+
+  const handleGuestSignup = async (e) => {
+    e.preventDefault();
+
+    if (!isEmailVerified) {
+      setGuestAuthError("이메일 인증을 완료해주세요.");
+      return;
+    }
+
+    if (guestFormData.password !== guestFormData.repeatPassword) {
+      setGuestAuthError("비밀번호가 일치하지 않습니다.");
+      return;
+    }
+
+    if (guestFormData.password.length < 8) {
+      setGuestAuthError("비밀번호는 8자 이상이어야 합니다.");
+      return;
+    }
+
+    setIsGuestAuthLoading(true);
+    setGuestAuthError("");
+
+    try {
+      const { guestSignup } = await import("../services/authService");
+      await guestSignup({
+        name: guestFormData.name,
+        email: guestFormData.email,
+        birthdate: guestFormData.birthdate,
+        phone: guestFormData.phone,
+        password: guestFormData.password,
+        repeatPassword: guestFormData.repeatPassword,
+      });
+
+      setGuestAuthSuccess("비회원 가입이 완료되었습니다. 로그인 중...");
+
+      // 가입 완료 후 자동 로그인
+      setTimeout(async () => {
+        try {
+          const success = await guestLogin({
+            email: guestFormData.email,
+            password: guestFormData.password,
+          });
+
+          if (success) {
+            setSelectedScreening(pendingScreening);
+            setPendingScreening(null);
+            setShowLoginSelection(false);
+            setLoginModalStep("selection");
+          }
+        } catch (loginError) {
+          setGuestAuthError(
+            "가입은 완료되었지만 자동 로그인에 실패했습니다. 다시 시도해주세요."
+          );
+        }
+      }, 1500);
+    } catch (error) {
+      setGuestAuthError(error.message || "가입에 실패했습니다.");
+    } finally {
+      setIsGuestAuthLoading(false);
+    }
+  };
+
+  const checkEmailAvailability = async () => {
+    if (!guestFormData.email) return;
+
+    try {
+      const { checkGuestEmailAvailability } = await import(
+        "../services/authService"
+      );
+      await checkGuestEmailAvailability(guestFormData.email);
+      setGuestAuthSuccess("사용 가능한 이메일입니다.");
+    } catch (error) {
+      setGuestAuthError("이미 사용 중인 이메일입니다.");
+    }
   };
 
   const handleTicketCountChange = useCallback(
@@ -533,8 +767,9 @@ const BookingPage = () => {
     async (newSeatIds) => {
       if (!selectedScreening?.screeningId || newSeatIds.length === 0) return;
 
-      // Filter out seats that are already held
-      const seatsToHold = newSeatIds.filter(
+      // 중복 제거 및 이미 보유한 좌석 필터링
+      const uniqueNewSeatIds = [...new Set(newSeatIds)];
+      const seatsToHold = uniqueNewSeatIds.filter(
         (id) => !heldSeatsRef.current.includes(id)
       );
 
@@ -550,8 +785,10 @@ const BookingPage = () => {
           seatIds: seatsToHold,
         });
 
-        // Add new held seats to the current list
-        heldSeatsRef.current = [...heldSeatsRef.current, ...seatsToHold];
+        // Add new held seats to the current list (중복 방지)
+        heldSeatsRef.current = [
+          ...new Set([...heldSeatsRef.current, ...seatsToHold]),
+        ];
         console.log("Currently held seats:", heldSeatsRef.current);
 
         // Reset timeout for all held seats
@@ -560,24 +797,35 @@ const BookingPage = () => {
         }
         seatHoldTimeoutRef.current = setTimeout(async () => {
           try {
-            await reservationService.releaseSeats({
-              screeningId: selectedScreening.screeningId,
-              seatIds: heldSeatsRef.current,
-            });
+            if (heldSeatsRef.current.length > 0) {
+              await reservationService.releaseSeats({
+                screeningId: selectedScreening.screeningId,
+                seatIds: [...new Set(heldSeatsRef.current)], // 중복 제거
+              });
+            }
             heldSeatsRef.current = [];
             alert("좌석 선점 시간이 만료되었습니다. 다시 선택해주세요.");
             setSelectedSeats([]);
           } catch (error) {
-            console.error("Failed to release seats:", error);
+            console.error("Failed to release seats on timeout:", error);
+            // 타임아웃 시 좌석 해제 실패해도 로컬 상태는 정리
+            heldSeatsRef.current = [];
+            setSelectedSeats([]);
           }
         }, 10 * 60 * 1000); // 10 minutes
       } catch (error) {
         console.error("Failed to hold new seats:", error);
 
         // Handle specific 409 error
-        if (error.message?.includes("이미 선택된 좌석")) {
+        if (
+          error.message?.includes("이미 선택된 좌석") ||
+          error.status === 409
+        ) {
           console.warn("Some seats are already held, trying to continue...");
-          // Don't show alert for this case, just log the warning
+          // 이미 선점된 좌석이라도 로컬 상태에는 추가 (UI 일관성 위해)
+          heldSeatsRef.current = [
+            ...new Set([...heldSeatsRef.current, ...seatsToHold]),
+          ];
         } else {
           alert("좌석 선점에 실패했습니다. 다시 시도해주세요.");
         }
@@ -590,20 +838,33 @@ const BookingPage = () => {
     async (seatIds) => {
       if (!selectedScreening?.screeningId || seatIds.length === 0) return;
 
+      // 중복 제거
+      const uniqueSeatIds = [...new Set(seatIds)];
+
       try {
-        console.log("Releasing specific seats:", seatIds);
+        console.log("Releasing specific seats:", uniqueSeatIds);
         await reservationService.releaseSeats({
           screeningId: selectedScreening.screeningId,
-          seatIds: seatIds,
+          seatIds: uniqueSeatIds,
         });
 
         // Remove released seats from held seats list
         heldSeatsRef.current = heldSeatsRef.current.filter(
-          (id) => !seatIds.includes(id)
+          (id) => !uniqueSeatIds.includes(id)
         );
         console.log("Remaining held seats:", heldSeatsRef.current);
       } catch (error) {
         console.error("Failed to release specific seats:", error);
+
+        // 409 오류 (이미 해제되었거나 권한 없음)인 경우에도 로컬 상태는 정리
+        if (error.status === 409) {
+          console.warn(
+            "Seats already released or no permission, cleaning local state"
+          );
+          heldSeatsRef.current = heldSeatsRef.current.filter(
+            (id) => !uniqueSeatIds.includes(id)
+          );
+        }
       }
     },
     [selectedScreening]
@@ -1061,6 +1322,19 @@ const BookingPage = () => {
       }
 
       // Prepare payment request data for v2 SDK
+      // 전화번호에서 특수문자 제거 (Toss Payments 요구사항)
+      const cleanPhoneNumber = (phone) => {
+        if (!phone) return "01000000000";
+        // 숫자만 남기고 모든 특수문자 제거
+        const cleaned = phone.replace(/[^0-9]/g, "");
+        // 올바른 한국 휴대폰 번호 형식인지 확인
+        if (cleaned.length === 11 && cleaned.startsWith("010")) {
+          return cleaned;
+        }
+        // 기본값 반환
+        return "01000000000";
+      };
+
       const paymentRequestData = {
         method: paymentMethod,
         amount: {
@@ -1073,7 +1347,7 @@ const BookingPage = () => {
         failUrl: TOSS_PAYMENTS_CONFIG.FAIL_URL,
         customerEmail: user?.email || `customer${userId}@example.com`,
         customerName: user?.name || user?.nickname || `고객${userId}`,
-        customerMobilePhone: user?.phone || user?.mobile || "01000000000",
+        customerMobilePhone: cleanPhoneNumber(user?.phone || user?.mobile),
       };
 
       // Add method-specific options
@@ -1372,36 +1646,186 @@ const BookingPage = () => {
       {showLoginSelection && (
         <LoginSelectionOverlay onClick={cancelLoginSelection}>
           <LoginSelectionModal onClick={(e) => e.stopPropagation()}>
-            <LoginSelectionTitle>
-              🎬 예매를 진행하시려면 로그인이 필요합니다
-            </LoginSelectionTitle>
-            <LoginSelectionText>
-              예매 방법을 선택해주세요. 회원 로그인 시 포인트 적립과 예매 내역
-              관리가 가능합니다.
-            </LoginSelectionText>
-            <LoginButtonsContainer>
-              <LoginOptionButton
-                className="member"
-                onClick={() => handleLoginSelection("member")}
-                fullWidth
-              >
-                👤 회원 로그인
-                <br />
-                <small>포인트 적립 • 예매 내역 관리</small>
-              </LoginOptionButton>
-              <LoginOptionButton
-                className="guest"
-                onClick={() => handleLoginSelection("guest")}
-                fullWidth
-              >
-                🚀 비회원 로그인
-                <br />
-                <small>간편 빠른 예매</small>
-              </LoginOptionButton>
-            </LoginButtonsContainer>
-            <CancelButton onClick={cancelLoginSelection} fullWidth>
-              취소
-            </CancelButton>
+            {loginModalStep === "selection" ? (
+              <>
+                <LoginSelectionTitle>
+                  🎬 예매를 진행하시려면 로그인이 필요합니다
+                </LoginSelectionTitle>
+                <LoginSelectionText>
+                  예매 방법을 선택해주세요. 회원 로그인 시 포인트 적립과 예매
+                  내역 관리가 가능합니다.
+                </LoginSelectionText>
+                <LoginButtonsContainer>
+                  <LoginOptionButton
+                    className="member"
+                    onClick={() => handleLoginSelection("member")}
+                    fullWidth
+                  >
+                    👤 회원 로그인
+                    <br />
+                    <small>포인트 적립 • 예매 내역 관리</small>
+                  </LoginOptionButton>
+                  <LoginOptionButton
+                    className="guest"
+                    onClick={() => handleLoginSelection("guest")}
+                    fullWidth
+                  >
+                    🚀 비회원 로그인
+                    <br />
+                    <small>간편 빠른 예매 • 임시 계정 생성</small>
+                  </LoginOptionButton>
+                </LoginButtonsContainer>
+                <CancelButton onClick={cancelLoginSelection} fullWidth>
+                  취소
+                </CancelButton>
+              </>
+            ) : (
+              <>
+                <LoginSelectionTitle>🚀 비회원 로그인</LoginSelectionTitle>
+                <LoginSelectionText>
+                  빠른 예매를 위한 임시 계정을 만들어보세요.
+                </LoginSelectionText>
+                <GuestAuthForm onSubmit={handleGuestSignup}>
+                  <FormRow>
+                    <Input
+                      label="이름"
+                      type="text"
+                      value={guestFormData.name}
+                      onChange={(e) =>
+                        handleGuestFormChange("name", e.target.value)
+                      }
+                      placeholder="이름을 입력하세요"
+                      required
+                    />
+                    <Input
+                      label="생년월일"
+                      type="date"
+                      value={guestFormData.birthdate}
+                      onChange={(e) =>
+                        handleGuestFormChange("birthdate", e.target.value)
+                      }
+                      required
+                    />
+                  </FormRow>
+
+                  <Input
+                    label="전화번호"
+                    type="tel"
+                    value={guestFormData.phone}
+                    onChange={(e) =>
+                      handleGuestFormChange("phone", e.target.value)
+                    }
+                    placeholder="010-1234-5678"
+                    required
+                  />
+
+                  <EmailVerificationSection>
+                    <VerificationRow>
+                      <Input
+                        label="이메일"
+                        type="email"
+                        value={guestFormData.email}
+                        onChange={(e) =>
+                          handleGuestFormChange("email", e.target.value)
+                        }
+                        placeholder="이메일을 입력하세요"
+                        required
+                        disabled={emailVerificationSent}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSendEmailVerification}
+                        disabled={
+                          isGuestAuthLoading ||
+                          emailVerificationSent ||
+                          !guestFormData.email
+                        }
+                      >
+                        {emailVerificationSent ? "전송됨" : "인증 요청"}
+                      </Button>
+                    </VerificationRow>
+
+                    {emailVerificationSent && (
+                      <VerificationRow style={{ marginTop: "1rem" }}>
+                        <Input
+                          label="인증 코드"
+                          type="text"
+                          value={emailVerificationCode}
+                          onChange={(e) =>
+                            setEmailVerificationCode(e.target.value)
+                          }
+                          placeholder="인증 코드를 입력하세요"
+                          required
+                          disabled={isEmailVerified}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleVerifyEmailCode}
+                          disabled={
+                            isGuestAuthLoading ||
+                            isEmailVerified ||
+                            !emailVerificationCode
+                          }
+                        >
+                          {isEmailVerified ? "인증완료" : "인증하기"}
+                        </Button>
+                      </VerificationRow>
+                    )}
+                  </EmailVerificationSection>
+
+                  <FormRow>
+                    <Input
+                      label="비밀번호"
+                      type="password"
+                      value={guestFormData.password}
+                      onChange={(e) =>
+                        handleGuestFormChange("password", e.target.value)
+                      }
+                      placeholder="비밀번호 (8자 이상)"
+                      required
+                    />
+                    <Input
+                      label="비밀번호 확인"
+                      type="password"
+                      value={guestFormData.repeatPassword}
+                      onChange={(e) =>
+                        handleGuestFormChange("repeatPassword", e.target.value)
+                      }
+                      placeholder="비밀번호 확인"
+                      required
+                    />
+                  </FormRow>
+
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    fullWidth
+                    disabled={isGuestAuthLoading || !isEmailVerified}
+                  >
+                    {isGuestAuthLoading ? "처리 중..." : "비회원 로그인"}
+                  </Button>
+                </GuestAuthForm>
+
+                {guestAuthError && (
+                  <ErrorMessage>{guestAuthError}</ErrorMessage>
+                )}
+                {guestAuthSuccess && (
+                  <SuccessMessage>{guestAuthSuccess}</SuccessMessage>
+                )}
+                <div style={{ marginTop: "1rem" }}>
+                  <CancelButton
+                    onClick={() => setLoginModalStep("selection")}
+                    fullWidth
+                  >
+                    뒤로 가기
+                  </CancelButton>
+                </div>
+              </>
+            )}
           </LoginSelectionModal>
         </LoginSelectionOverlay>
       )}

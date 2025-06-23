@@ -179,7 +179,15 @@ const MovieDetailPage = () => {
 
         <ShowtimesSection>
           <ShowtimesTitle>
-            상영 시간표 (오늘: {formatDate(getTodayDateString())})
+            상영 시간표 (오늘:{" "}
+            {(() => {
+              const today = getTodayDateString();
+              console.log("MovieDetailPage - getTodayDateString():", today);
+              const formatted = formatDate(today);
+              console.log("MovieDetailPage - formatDate result:", formatted);
+              return formatted;
+            })()}
+            )
           </ShowtimesTitle>
           {sortedScreeningsToday.length > 0 ? (
             <ShowtimesGrid>

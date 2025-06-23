@@ -1,19 +1,42 @@
 // src/utils/dateUtils.js
 
 /**
- * Generates an array of date objects for the next N days.
+ * Generates an array of date objects for the next N days (Korean timezone).
  * @param {number} numDays - Number of days to generate.
- * @param {Date} [startDate=new Date()] - The starting date.
+ * @param {Date} [startDate] - The starting date. If not provided, uses Korean today.
  * @returns {Array<{shortDate: string, dayName: string, dayOfMonth: number, fullDate: Date}>}
  */
-export const getNextDays = (numDays, startDate = new Date()) => {
+export const getNextDays = (numDays, startDate) => {
   const days = [];
+
+  // 시작 날짜가 없으면 한국 시간 기준 오늘 날짜 사용
+  let baseDate;
+  if (startDate) {
+    baseDate = new Date(startDate);
+  } else {
+    // 한국 시간대 기준 오늘 날짜
+    const now = new Date();
+    const koreanTime = new Date(now.getTime() + 9 * 60 * 60 * 1000); // UTC+9
+    baseDate = new Date(
+      koreanTime.getUTCFullYear(),
+      koreanTime.getUTCMonth(),
+      koreanTime.getUTCDate()
+    );
+  }
+
   for (let i = 0; i < numDays; i++) {
-    const date = new Date(startDate);
-    date.setDate(startDate.getDate() + i);
+    const date = new Date(baseDate);
+    date.setDate(baseDate.getDate() + i);
+
+    // 한국 시간대 기준으로 문자열 생성
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const shortDate = `${year}-${month}-${day}`;
+
     days.push({
       fullDate: date, // Store the full date object
-      shortDate: date.toISOString().split("T")[0], // YYYY-MM-DD
+      shortDate: shortDate, // YYYY-MM-DD
       dayName: date.toLocaleDateString("ko-KR", { weekday: "short" }),
       dayOfMonth: date.getDate(),
     });
@@ -87,11 +110,23 @@ export const extractTime = (dateTimeString) => {
 };
 
 /**
- * Get today's date in YYYY-MM-DD format.
+ * Get today's date in YYYY-MM-DD format (Korean timezone).
  * @returns {string}
  */
 export const getTodayDateString = () => {
-  return new Date().toISOString().split("T")[0];
+  // 한국 시간대(Asia/Seoul)에 맞춰 날짜 계산
+  const now = new Date();
+  const koreanTime = new Date(now.getTime() + 9 * 60 * 60 * 1000); // UTC+9
+
+  // 한국 시간대 기준으로 날짜 계산
+  const year = koreanTime.getUTCFullYear();
+  const month = String(koreanTime.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(koreanTime.getUTCDate()).padStart(2, "0");
+
+  // console.log("getTodayDateString - Korean time:", koreanTime.toISOString());
+  // console.log("getTodayDateString - Result:", `${year}-${month}-${day}`);
+
+  return `${year}-${month}-${day}`;
 };
 
 /**

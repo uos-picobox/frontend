@@ -139,6 +139,7 @@ export const API_ENDPOINTS_CUSTOMER = {
   // Customer Profile APIs
   GET_MY_INFO: `/api/protected/customer/get`,
   UPDATE_MY_INFO: `/api/protected/customer/update`,
+  DELETE_MY_ACCOUNT: `/api/protected/customer/delete`,
 
   // Password Reset APIs
   FIND_PASSWORD_VERIFY_EMAIL: `/api/customer/find/password/verify/email`,

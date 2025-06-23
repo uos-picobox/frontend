@@ -388,6 +388,29 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  const deleteMyAccount = useCallback(async () => {
+    try {
+      await authService.deleteMyAccount();
+      // 계정 삭제 후 로그아웃 처리
+      setSessionId(null);
+      setUser(null);
+      setIsAdmin(false);
+      setAuthError(null);
+      // 로컬 스토리지 정리
+      localStorage.removeItem("sessionId");
+      localStorage.removeItem("sessionExpiresAt");
+      localStorage.removeItem("userData");
+      localStorage.removeItem("adminData");
+      // 쿠키 정리
+      document.cookie =
+        "sessionId=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      return true;
+    } catch (error) {
+      console.error("회원 탈퇴 오류:", error);
+      throw error;
+    }
+  }, []);
+
   const deleteAdminAccount = useCallback(async () => {
     try {
       await authService.deleteAdminAccount();
@@ -428,6 +451,7 @@ export const AuthProvider = ({ children }) => {
     checkEmail,
     getMyProfile,
     updateMyProfile,
+    deleteMyAccount,
     deleteAdminAccount,
     clearAuthError: useCallback(() => setAuthError(null), []),
   };

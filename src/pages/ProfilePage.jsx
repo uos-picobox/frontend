@@ -171,8 +171,15 @@ const PaymentStatus = styled.span`
 // NotLoggedInMessage is removed as App.js's UserProtectedRoute handles redirection
 
 const ProfilePage = () => {
-  const { user, isLoading, logout, updateMyProfile, getMyProfile, sessionId } =
-    useAuth();
+  const {
+    user,
+    isLoading,
+    logout,
+    updateMyProfile,
+    getMyProfile,
+    sessionId,
+    deleteMyAccount,
+  } = useAuth();
   const navigate = useNavigate();
   const [reservations, setReservations] = useState([]);
   const [reservationsLoading, setReservationsLoading] = useState(false);
@@ -267,9 +274,17 @@ const ProfilePage = () => {
                 await reservationService.getMyReservations();
               setReservations(userReservations || []);
             } catch (reservationError) {
-              if (reservationError.status === 404) {
-                setReservations([]); // 예약 내역이 없는 경우
-              } else {
+              console.warn("예약 내역 조회 실패:", reservationError.message);
+              setReservations([]); // 실패해도 빈 배열로 설정
+              if (reservationError.status === 401) {
+                setReservationsError(
+                  "세션이 만료되었습니다. 다시 로그인해주세요."
+                );
+              } else if (reservationError.status === 500) {
+                // 500 오류는 로그만 남기고 에러 메시지는 표시하지 않음
+                console.warn("예약 내역 서버 오류 발생, 빈 목록으로 표시");
+              } else if (reservationError.status !== 404) {
+                // 404가 아닌 경우만 에러 메시지 표시 (404는 예약 내역이 없는 정상 상황)
                 setReservationsError("예약 내역을 불러올 수 없습니다.");
               }
             }
@@ -296,14 +311,31 @@ const ProfilePage = () => {
               await reservationService.getMyReservations();
             setReservations(userReservations || []);
           } catch (reservationError) {
-            if (reservationError.status === 500) {
-              setReservationsError(
-                "서비스가 일시적으로 이용불가합니다. 잠시 후 다시 시도해주세요."
-              );
-            } else if (reservationError.status === 404) {
-              setReservations([]);
-            } else {
-              setReservationsError("데이터를 불러오는데 실패했습니다.");
+            console.warn(
+              "예약 내역 조회 실패 (프로필 실패 후):",
+              reservationError.message
+            );
+            setReservations([]); // 실패해도 빈 배열로 설정
+            if (reservationError.status === 401) {
+              // 이미 프로필에서 401 오류 처리했으므로 중복 메시지 방지
+              if (!reservationsError) {
+                setReservationsError(
+                  "세션이 만료되었습니다. 다시 로그인해주세요."
+                );
+              }
+            } else if (reservationError.status === 500) {
+              // 500 오류는 로그만 남기고 사용자에게는 일반적인 메시지
+              console.warn("예약 내역 서버 오류 발생");
+              if (!reservationsError) {
+                setReservationsError(
+                  "일시적으로 예약 내역을 불러올 수 없습니다."
+                );
+              }
+            } else if (reservationError.status !== 404) {
+              // 404가 아닌 경우만 에러 메시지 표시
+              if (!reservationsError) {
+                setReservationsError("예약 내역을 불러올 수 없습니다.");
+              }
             }
           }
         } finally {
@@ -343,36 +375,34 @@ const ProfilePage = () => {
 
               setPointBalance(pointValue);
             } else {
+              // 포인트 잔액 조회 실패 시에도 기본값으로 설정
+              console.warn("포인트 잔액 조회 실패:", balance.reason?.message);
+              setPointBalance(0);
               if (balance.reason?.status === 401) {
                 setPointError(
                   "세션이 만료되었습니다. 페이지를 새로고침하거나 다시 로그인해주세요."
                 );
-              } else {
-                setPointError("포인트 잔액을 불러올 수 없습니다.");
               }
+              // 500, 404 등 기타 오류는 에러 메시지 표시하지 않고 기본값만 설정
             }
 
             if (history.status === "fulfilled") {
               setPointHistory(history.value || []);
             } else {
-              if (
-                history.reason?.status !== 401 &&
-                balance.status === "fulfilled"
-              ) {
-                // 잔액은 성공했지만 내역만 실패한 경우
-                setPointHistory([]);
-              }
+              // 포인트 내역 조회 실패 시에도 빈 배열로 설정
+              console.warn("포인트 내역 조회 실패:", history.reason?.message);
+              setPointHistory([]);
+              // 잔액 조회가 실패하지 않은 경우에만 내역 오류는 무시
             }
           } catch (pointError) {
+            // catch 블록은 Promise.allSettled에서는 실행되지 않지만 안전장치로 유지
+            console.warn("포인트 정보 로드 중 예외 발생:", pointError);
+            setPointBalance(0);
+            setPointHistory([]);
             if (pointError.status === 401) {
               setPointError(
                 "세션이 만료되었습니다. 페이지를 새로고침하거나 다시 로그인해주세요."
               );
-            } else if (pointError.status === 404) {
-              setPointBalance(0);
-              setPointHistory([]);
-            } else {
-              setPointError("포인트 정보를 불러올 수 없습니다.");
             }
           } finally {
             setPointLoading(false);
@@ -382,7 +412,7 @@ const ProfilePage = () => {
           setPointLoading(false);
         }
 
-        // 결제 내역 로드 (현재 API가 전체 결제 내역을 지원하지 않으므로 스킵)
+        // 결제 내역 로드
         if (sessionId) {
           setPaymentLoading(true);
           setPaymentError(null);
@@ -390,13 +420,15 @@ const ProfilePage = () => {
             const paymentData = await paymentService.getAllPaymentHistory();
             setPaymentHistory(paymentData || []);
           } catch (paymentError) {
+            // 결제 내역 조회 실패해도 빈 배열로 설정하여 페이지 로딩 방해하지 않음
+            console.warn("결제 내역 조회 실패:", paymentError.message);
+            setPaymentHistory([]);
             if (paymentError.status === 401) {
               setPaymentError(
                 "세션이 만료되었습니다. 페이지를 새로고침하거나 다시 로그인해주세요."
               );
-            } else {
-              setPaymentError("결제 내역을 불러올 수 없습니다.");
             }
+            // 500, 404 등 기타 오류는 이미 paymentService에서 처리되므로 에러 메시지 표시하지 않음
           } finally {
             setPaymentLoading(false);
           }
@@ -421,12 +453,21 @@ const ProfilePage = () => {
   // Handle profile editing
   const handleEditProfile = () => {
     const currentProfile = actualUserProfile || user;
+
+    // 성별 값을 API에서 받은 형식에서 폼에 맞는 형식으로 변환
+    const normalizeGender = (gender) => {
+      if (!gender) return "";
+      if (gender === "Male") return "MALE";
+      if (gender === "Female") return "FEMALE";
+      return gender; // 이미 MALE/FEMALE 형식인 경우 그대로 유지
+    };
+
     setEditProfileData({
       name: currentProfile.name || "",
       email: currentProfile.email || "",
       phone: currentProfile.phone || "",
       dateOfBirth: currentProfile.dateOfBirth || "",
-      gender: currentProfile.gender || "",
+      gender: normalizeGender(currentProfile.gender),
     });
     setIsEditingProfile(true);
     setProfileUpdateError(null);
@@ -454,6 +495,13 @@ const ProfilePage = () => {
         loginId: currentProfile.loginId,
         ...editProfileData,
       };
+
+      // 성별 값이 올바른 형식인지 확인 (디버깅용)
+      console.log("프로필 업데이트 데이터:", updatedProfile);
+      if (updatedProfile.gender) {
+        console.log("전송될 성별 값:", updatedProfile.gender);
+      }
+
       const result = await updateMyProfile(updatedProfile);
 
       // 업데이트된 프로필 데이터로 로컬 상태 업데이트
@@ -486,6 +534,33 @@ const ProfilePage = () => {
   const handleCloseReservationModal = () => {
     setShowReservationModal(false);
     setSelectedReservationId(null);
+  };
+
+  const handleDeleteAccount = async () => {
+    // 2단계 확인
+    const firstConfirm = window.confirm(
+      "정말로 회원 탈퇴를 하시겠습니까?\n\n탈퇴 시 다음 사항이 적용됩니다:\n• 모든 개인정보가 삭제됩니다\n• 예매 내역 및 포인트가 모두 사라집니다\n• 이 작업은 되돌릴 수 없습니다"
+    );
+
+    if (!firstConfirm) return;
+
+    const secondConfirm = window.confirm(
+      "정말로 탈퇴하시겠습니까?\n\n이 작업은 즉시 실행되며 되돌릴 수 없습니다."
+    );
+
+    if (!secondConfirm) return;
+
+    try {
+      await deleteMyAccount();
+      alert("회원 탈퇴가 완료되었습니다. 그동안 이용해 주셔서 감사합니다.");
+      navigate("/");
+    } catch (error) {
+      console.error("회원 탈퇴 실패:", error);
+      alert(
+        "회원 탈퇴 중 오류가 발생했습니다: " +
+          (error.message || "알 수 없는 오류가 발생했습니다.")
+      );
+    }
   };
 
   // 실제 프로필 데이터가 있으면 우선 사용, 없으면 AuthContext의 user 데이터 사용
@@ -631,7 +706,14 @@ const ProfilePage = () => {
               )}
               {gender && (
                 <p>
-                  <strong>성별:</strong> <span>{gender}</span>
+                  <strong>성별:</strong>{" "}
+                  <span>
+                    {gender === "MALE" || gender === "Male"
+                      ? "남성"
+                      : gender === "FEMALE" || gender === "Female"
+                      ? "여성"
+                      : gender}
+                  </span>
                 </p>
               )}
               <Button
@@ -756,8 +838,8 @@ const ProfilePage = () => {
                   }}
                 >
                   <option value="">선택해주세요</option>
-                  <option value="Male">남성</option>
-                  <option value="Female">여성</option>
+                  <option value="MALE">남성</option>
+                  <option value="FEMALE">여성</option>
                 </select>
               </div>
               <div
@@ -1003,15 +1085,43 @@ const ProfilePage = () => {
         </OtherSections>
       </ProfileGrid>
       <div style={{ marginTop: "2rem", textAlign: "center" }}>
-        <Button
-          variant="outline"
-          onClick={() => {
-            logout();
-            navigate("/");
+        <div
+          style={{
+            display: "flex",
+            gap: "1rem",
+            justifyContent: "center",
+            flexWrap: "wrap",
           }}
         >
-          로그아웃
-        </Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              logout();
+              navigate("/");
+            }}
+          >
+            로그아웃
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleDeleteAccount}
+            style={{
+              color: "#dc3545",
+              borderColor: "#dc3545",
+              backgroundColor: "transparent",
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = "#dc3545";
+              e.target.style.color = "white";
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = "transparent";
+              e.target.style.color = "#dc3545";
+            }}
+          >
+            회원 탈퇴
+          </Button>
+        </div>
       </div>
 
       <ReservationDetailModal
