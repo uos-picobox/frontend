@@ -92,7 +92,7 @@ const StyledButton = styled.button.withConfig({
           background-color: ${theme.colors.error};
           color: ${theme.colors.white};
           &:hover:not(:disabled) {
-            background-color: darken(${theme.colors.error}, 0.1);
+            background-color: #dc2626; /* red-600 for darker hover */
           }
         `;
       case "text": // For icon buttons or simple text buttons

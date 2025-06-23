@@ -14,6 +14,9 @@ import {
   PlusSquare,
   Video,
   List,
+  MessageSquare,
+  Percent,
+  UserCheck,
 } from "lucide-react";
 
 const SidebarWrapper = styled.aside`
@@ -129,6 +132,26 @@ const AdminSidebar = () => {
           path: "/admin/prices",
           label: "가격 설정 관리",
           icon: <DollarSign />,
+        },
+      ],
+    },
+    {
+      group: "고객 서비스",
+      items: [
+        {
+          path: "/admin/reviews",
+          label: "리뷰 관리",
+          icon: <MessageSquare />,
+        },
+        {
+          path: "/admin/discounts",
+          label: "할인 관리",
+          icon: <Percent />,
+        },
+        {
+          path: "/admin/customers",
+          label: "고객 관리",
+          icon: <UserCheck />,
         },
       ],
     },

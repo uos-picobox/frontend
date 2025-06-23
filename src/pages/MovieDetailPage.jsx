@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import styled from "styled-components";
 import { useParams, useNavigate } from "react-router-dom";
 import MovieDetailsDisplay from "../components/movie/MovieDetailsDisplay";
+import ReviewSection from "../components/movie/ReviewSection";
 import Button from "../components/common/Button";
 import * as movieService from "../services/movieService";
 import * as screeningService from "../services/screeningService"; // Ensure this is correct path
@@ -240,6 +241,11 @@ const MovieDetailPage = () => {
             예매하기
           </Button>
         </BookNowButtonContainer>
+
+        <ReviewSection
+          movieId={movieDetails.movieId}
+          movieTitle={movieDetails.title}
+        />
       </ContentContainer>
     </DetailPageWrapper>
   );

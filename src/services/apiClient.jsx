@@ -244,6 +244,48 @@ const apiClient = {
     return handleResponse(response);
   },
 
+  patch: async (endpoint, data, isFormData = false) => {
+    const sessionId = getSessionId();
+    const headers = {};
+
+    // 백엔드에서 기대하는 Authorization 헤더 형식으로 설정
+    if (sessionId) {
+      headers["Authorization"] = sessionId; // sessionId를 그대로 Authorization 헤더에 설정
+    }
+
+    let body;
+    if (isFormData) {
+      body = data; // data is FormData
+    } else {
+      headers["Content-Type"] = "application/json";
+      body = JSON.stringify(data);
+    }
+
+    console.log("apiClient PATCH:", {
+      url: `${API_BASE_URL}${endpoint}`,
+      headers: headers,
+      data: data,
+      isFormData: isFormData,
+      bodyPreview: isFormData ? "[FormData]" : body,
+    });
+
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: "PATCH",
+      headers,
+      body,
+      credentials: "include", // 쿠키 포함
+    });
+
+    console.log("apiClient PATCH response:", {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      url: `${API_BASE_URL}${endpoint}`,
+    });
+
+    return handleResponse(response);
+  },
+
   delete: async (endpoint, data = null) => {
     // DELETE can sometimes have a body for multiple deletions, though rare
     const sessionId = getSessionId();

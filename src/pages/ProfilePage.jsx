@@ -8,11 +8,13 @@ import { formatDate } from "../utils/dateUtils";
 import * as reservationService from "../services/reservationService";
 import * as pointService from "../services/pointService";
 import * as paymentService from "../services/paymentService";
+import * as reviewService from "../services/reviewService";
 import ReservationDetailModal from "../components/booking/ReservationDetailModal";
 
 const ProfilePageWrapper = styled.div`
   background-color: ${({ theme }) => theme.colors.surface};
   padding: ${({ theme }) => theme.spacing[4]};
+  padding-bottom: ${({ theme }) => theme.spacing[10]};
   border-radius: ${({ theme }) => theme.borderRadius.xl};
   box-shadow: ${({ theme }) => theme.shadows.lg};
   margin-top: ${({ theme }) => theme.spacing[6]};
@@ -136,6 +138,97 @@ const ReservationInfo = styled.div`
   }
 `;
 
+const ReviewList = styled.div`
+  max-height: 300px;
+  overflow-y: auto;
+  margin-top: ${({ theme }) => theme.spacing[2]};
+`;
+
+const ReviewItem = styled.div`
+  background-color: ${({ theme }) => theme.colors.surface};
+  padding: ${({ theme }) => theme.spacing[3]};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  margin-bottom: ${({ theme }) => theme.spacing[2]};
+  border-left: 4px solid ${({ theme }) => theme.colors.warning};
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background-color: ${({ theme }) => theme.colors.surfaceLight};
+    transform: translateY(-1px);
+    box-shadow: ${({ theme }) => theme.shadows.md};
+  }
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+`;
+
+const ReviewInfo = styled.div`
+  font-size: ${({ theme }) => theme.fontSizes.sm};
+  color: ${({ theme }) => theme.colors.textDark};
+
+  p {
+    margin: ${({ theme }) => theme.spacing[1]} 0;
+
+    strong {
+      color: ${({ theme }) => theme.colors.text};
+      font-weight: 600;
+    }
+  }
+`;
+
+const PaymentList = styled.div`
+  max-height: 300px;
+  overflow-y: auto;
+  margin-top: ${({ theme }) => theme.spacing[2]};
+`;
+
+const PaymentItem = styled.div`
+  background-color: ${({ theme }) => theme.colors.surface};
+  padding: ${({ theme }) => theme.spacing[3]};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  margin-bottom: ${({ theme }) => theme.spacing[2]};
+  border-left: 4px solid
+    ${({ status, theme }) => {
+      switch (status) {
+        case "DONE":
+          return theme.colors.success;
+        case "REFUNDED":
+          return theme.colors.error;
+        case "IN_PROGRESS":
+          return theme.colors.warning;
+        default:
+          return theme.colors.primaryLight;
+      }
+    }};
+  transition: all 0.2s ease;
+
+  &:hover {
+    background-color: ${({ theme }) => theme.colors.surfaceLight};
+    transform: translateY(-1px);
+    box-shadow: ${({ theme }) => theme.shadows.md};
+  }
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+`;
+
+const PaymentInfo = styled.div`
+  font-size: ${({ theme }) => theme.fontSizes.sm};
+  color: ${({ theme }) => theme.colors.textDark};
+
+  p {
+    margin: ${({ theme }) => theme.spacing[1]} 0;
+
+    strong {
+      color: ${({ theme }) => theme.colors.text};
+      font-weight: 600;
+    }
+  }
+`;
+
 const PaymentStatus = styled.span`
   display: inline-block;
   padding: 2px 8px;
@@ -144,24 +237,24 @@ const PaymentStatus = styled.span`
   font-weight: 500;
   background-color: ${({ status, theme }) => {
     switch (status) {
-      case "COMPLETED":
+      case "DONE":
         return theme.colors.success + "20";
-      case "PENDING":
-        return theme.colors.warning + "20";
-      case "CANCELLED":
+      case "REFUNDED":
         return theme.colors.error + "20";
+      case "IN_PROGRESS":
+        return theme.colors.warning + "20";
       default:
         return theme.colors.disabled + "20";
     }
   }};
   color: ${({ status, theme }) => {
     switch (status) {
-      case "COMPLETED":
+      case "DONE":
         return theme.colors.success;
-      case "PENDING":
-        return theme.colors.warning;
-      case "CANCELLED":
+      case "REFUNDED":
         return theme.colors.error;
+      case "IN_PROGRESS":
+        return theme.colors.warning;
       default:
         return theme.colors.disabled;
     }
@@ -204,6 +297,9 @@ const ProfilePage = () => {
   const [paymentError, setPaymentError] = useState(null);
   const [selectedReservationId, setSelectedReservationId] = useState(null);
   const [showReservationModal, setShowReservationModal] = useState(false);
+  const [myReviews, setMyReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsError, setReviewsError] = useState(null);
 
   // Load user's reservations
   useEffect(() => {
@@ -435,6 +531,39 @@ const ProfilePage = () => {
         } else {
           setPaymentError("일부 기능을 사용하려면 페이지를 새로고침해주세요.");
           setPaymentLoading(false);
+        }
+
+        // 내가 작성한 리뷰 목록 로드
+        if (sessionId) {
+          setReviewsLoading(true);
+          setReviewsError(null);
+          try {
+            const reviewsData = await reviewService.getMyReviews(0, 10);
+            console.log("My reviews data:", reviewsData);
+
+            // API 응답 구조에 따라 리뷰 데이터 추출
+            if (reviewsData && reviewsData.content) {
+              setMyReviews(reviewsData.content);
+            } else if (Array.isArray(reviewsData)) {
+              setMyReviews(reviewsData);
+            } else {
+              setMyReviews([]);
+            }
+          } catch (reviewError) {
+            console.warn("내 리뷰 목록 조회 실패:", reviewError.message);
+            setMyReviews([]);
+            if (reviewError.status === 401) {
+              setReviewsError(
+                "세션이 만료되었습니다. 페이지를 새로고침하거나 다시 로그인해주세요."
+              );
+            }
+            // 500, 404 등 기타 오류는 에러 메시지 표시하지 않음
+          } finally {
+            setReviewsLoading(false);
+          }
+        } else {
+          setReviewsError("일부 기능을 사용하려면 페이지를 새로고침해주세요.");
+          setReviewsLoading(false);
         }
       };
       loadUserData();
@@ -1008,43 +1137,38 @@ const ProfilePage = () => {
               !paymentError &&
               paymentHistory.length === 0 && <p>결제 내역이 없습니다.</p>}
             {!paymentLoading && !paymentError && paymentHistory.length > 0 && (
-              <div style={{ maxHeight: "200px", overflow: "auto" }}>
+              <PaymentList>
                 {paymentHistory.slice(0, 5).map((payment, index) => (
-                  <div
+                  <PaymentItem
                     key={payment.paymentId || index}
-                    style={{
-                      padding: "0.75rem",
-                      marginBottom: "0.5rem",
-                      backgroundColor: "#f8f9fa",
-                      borderRadius: "4px",
-                      borderLeft: "3px solid #007bff",
-                    }}
+                    status={payment.paymentStatus}
                   >
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        marginBottom: "0.5rem",
-                      }}
-                    >
-                      <span style={{ fontWeight: "600", fontSize: "0.9rem" }}>
-                        {payment.orderName || `주문 #${payment.orderId}`}
-                      </span>
-                      <span
-                        style={{
-                          color: "#007bff",
-                          fontWeight: "bold",
-                          fontSize: "0.9rem",
-                        }}
-                      >
-                        {payment.finalAmount?.toLocaleString() ||
-                          payment.amount?.toLocaleString()}
-                        원
-                      </span>
-                    </div>
-                    <div style={{ fontSize: "0.8rem", color: "#666" }}>
-                      <p style={{ margin: "0.25rem 0" }}>
+                    <PaymentInfo>
+                      <p>
+                        <strong>주문 #{payment.orderId}</strong>
+                        <span
+                          style={{
+                            float: "right",
+                            color: "#007bff",
+                            fontWeight: "600",
+                          }}
+                        >
+                          {payment.finalAmount?.toLocaleString()}원
+                        </span>
+                      </p>
+                      <p>
+                        결제상태:{" "}
+                        <PaymentStatus status={payment.paymentStatus}>
+                          {payment.paymentStatus === "DONE"
+                            ? "결제완료"
+                            : payment.paymentStatus === "REFUNDED"
+                            ? "환불완료"
+                            : payment.paymentStatus === "IN_PROGRESS"
+                            ? "결제진행중"
+                            : payment.paymentStatus}
+                        </PaymentStatus>
+                      </p>
+                      <p>
                         결제수단:{" "}
                         {payment.paymentMethod === "CARD"
                           ? "카드"
@@ -1054,18 +1178,32 @@ const ProfilePage = () => {
                           ? "휴대폰"
                           : payment.paymentMethod || "카드"}
                       </p>
-                      <p style={{ margin: "0.25rem 0" }}>
-                        결제일:{" "}
-                        {formatDate(payment.paymentDate || payment.createdAt)}
-                      </p>
+                      <p>결제요청일: {formatDate(payment.requestedAt)}</p>
+                      {payment.approvedAt && (
+                        <p>결제승인일: {formatDate(payment.approvedAt)}</p>
+                      )}
                       {payment.usedPointAmount > 0 && (
-                        <p style={{ margin: "0.25rem 0", color: "#28a745" }}>
+                        <p style={{ color: "#28a745" }}>
                           포인트 사용:{" "}
                           {payment.usedPointAmount?.toLocaleString()}P
                         </p>
                       )}
-                    </div>
-                  </div>
+                      {payment.paymentDiscountInfo && (
+                        <p style={{ color: "#fd7e14" }}>
+                          할인: {payment.paymentDiscountInfo.providerName} (
+                          {payment.paymentDiscountInfo.discountRate}% 할인)
+                        </p>
+                      )}
+                      {payment.amount !== payment.finalAmount && (
+                        <p style={{ fontSize: "0.75rem", color: "#6c757d" }}>
+                          원가: {payment.amount?.toLocaleString()}원 →{" "}
+                          <strong>
+                            {payment.finalAmount?.toLocaleString()}원
+                          </strong>
+                        </p>
+                      )}
+                    </PaymentInfo>
+                  </PaymentItem>
                 ))}
                 {paymentHistory.length > 5 && (
                   <p
@@ -1079,7 +1217,61 @@ const ProfilePage = () => {
                     {paymentHistory.length - 5}개의 결제 내역이 더 있습니다.
                   </p>
                 )}
-              </div>
+              </PaymentList>
+            )}
+          </SectionCard>
+
+          <SectionCard>
+            <h3>내가 작성한 리뷰</h3>
+            {reviewsLoading && <p>리뷰 목록을 불러오는 중...</p>}
+            {reviewsError && (
+              <p style={{ color: "red", fontSize: "0.9rem" }}>{reviewsError}</p>
+            )}
+            {!reviewsLoading && !reviewsError && myReviews.length === 0 && (
+              <p>작성한 리뷰가 없습니다.</p>
+            )}
+            {!reviewsLoading && !reviewsError && myReviews.length > 0 && (
+              <ReviewList>
+                {myReviews.slice(0, 5).map((review, index) => (
+                  <ReviewItem
+                    key={review.reviewId || index}
+                    onClick={() => {
+                      if (review.movieId) {
+                        navigate(`/movies/${review.movieId}`);
+                      }
+                    }}
+                    title="클릭하여 영화 상세 페이지로 이동"
+                  >
+                    <ReviewInfo>
+                      <p>
+                        <strong>{review.movieTitle || "영화 제목 없음"}</strong>
+                      </p>
+                      <p>
+                        평점: {"★".repeat(Math.floor(review.rating))}
+                        {"☆".repeat(5 - Math.floor(review.rating))}{" "}
+                        {review.rating}점
+                      </p>
+                      <p>리뷰: {review.comment}</p>
+                      <p>작성일: {formatDate(review.createdAt)}</p>
+                      {review.likeCount > 0 && (
+                        <p>좋아요: ❤️ {review.likeCount}개</p>
+                      )}
+                    </ReviewInfo>
+                  </ReviewItem>
+                ))}
+                {myReviews.length > 5 && (
+                  <p
+                    style={{
+                      textAlign: "center",
+                      marginTop: "1rem",
+                      fontSize: "0.9rem",
+                      color: "#666",
+                    }}
+                  >
+                    {myReviews.length - 5}개의 리뷰가 더 있습니다.
+                  </p>
+                )}
+              </ReviewList>
             )}
           </SectionCard>
         </OtherSections>

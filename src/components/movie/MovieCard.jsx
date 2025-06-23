@@ -162,10 +162,10 @@ const MovieCard = ({
 }) => {
   if (!movie) return null;
 
-  // MovieResponseDto has movieRating.ratingName and voteAverage (if available from API)
-  const displayRating = movie.voteAverage
-    ? (movie.voteAverage / 2).toFixed(1)
-    : parseFloat(movie.ratingFallback || "0").toFixed(1); // Example if API has voteAverage out of 10
+  // MovieResponseDto has movieRating.ratingName and reviewRating (if available from API)
+  const displayRating = movie.reviewRating
+    ? parseFloat(movie.reviewRating).toFixed(1)
+    : "0.0";
   const ageRatingDisplay = movie.movieRatingName || "전체";
 
   const handleImageError = (e) => {
