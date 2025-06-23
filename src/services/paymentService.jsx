@@ -178,6 +178,13 @@ export const confirmPayment = async (confirmData) => {
     return result;
   } catch (error) {
     console.error("paymentService: confirmPayment error:", error);
+
+    // Enhance error with status information for better handling
+    if (error.status) {
+      error.isHttpError = true;
+      error.httpStatus = error.status;
+    }
+
     throw error;
   }
 };
@@ -187,7 +194,12 @@ export const confirmPayment = async (confirmData) => {
  * @returns {string}
  */
 export const generateOrderId = () => {
-  return "ORDER-" + Date.now() + "-" + Math.floor(Math.random() * 1000000);
+  const timestamp = Date.now();
+  const random = Math.floor(Math.random() * 1000000);
+  const orderId = `ORDER-${timestamp}-${random}`;
+
+  console.log("Generated orderId:", orderId);
+  return orderId;
 };
 
 /**

@@ -109,6 +109,20 @@ const PaymentFailPage = () => {
       FORBIDDEN_REQUEST:
         "요청이 거부되었습니다. 주문번호나 결제 정보를 확인해주세요.",
 
+      // 결제 확인 관련 오류 (새로 추가)
+      PAYMENT_CONFIRMATION_FAILED:
+        "결제 확인 과정에서 오류가 발생했습니다. 잘못된 주문번호이거나 결제가 이미 처리되었을 수 있습니다.",
+      PAYMENT_ERROR:
+        "결제 처리 중 서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+
+      // 결제 정보 검증 오류
+      INVALID_PAYMENT_PARAMS:
+        "결제 정보가 올바르지 않습니다. 필수 정보가 누락되었습니다.",
+      INVALID_ORDER_ID: "잘못된 주문번호 형식입니다.",
+      AMOUNT_MISMATCH:
+        "결제 금액이 일치하지 않습니다. 보안상의 이유로 결제가 취소되었습니다.",
+      ORDER_ID_MISMATCH: "주문번호가 일치하지 않습니다.",
+
       // 기타 오류
       CONFIRMATION_FAILED: "결제 확인 중 오류가 발생했습니다.",
       NETWORK_ERROR: "네트워크 오류가 발생했습니다.",

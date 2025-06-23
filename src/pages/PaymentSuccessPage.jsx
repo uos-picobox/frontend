@@ -95,9 +95,35 @@ const PaymentSuccessPage = () => {
       const paymentKey = searchParams.get("paymentKey");
       const amount = parseInt(searchParams.get("amount"));
 
+      console.log("PaymentSuccessPage - URL params:", {
+        orderId,
+        paymentKey,
+        amount,
+      });
+
+      // Enhanced validation
       if (!orderId || !paymentKey || !amount) {
+        console.error("Missing required payment parameters:", {
+          orderId: !!orderId,
+          paymentKey: !!paymentKey,
+          amount: !!amount,
+        });
         setConfirmationError("결제 정보가 올바르지 않습니다.");
         setIsConfirming(false);
+        navigate(
+          "/payment/fail?code=INVALID_PAYMENT_PARAMS&message=결제 정보가 올바르지 않습니다."
+        );
+        return;
+      }
+
+      // Validate orderId format
+      if (!orderId.startsWith("ORDER-") || orderId.length < 15) {
+        console.error("Invalid orderId format:", orderId);
+        setConfirmationError("잘못된 주문번호 형식입니다.");
+        setIsConfirming(false);
+        navigate(
+          "/payment/fail?code=INVALID_ORDER_ID&message=잘못된 주문번호 형식입니다."
+        );
         return;
       }
 
@@ -107,15 +133,37 @@ const PaymentSuccessPage = () => {
         try {
           const paymentData = JSON.parse(savedPaymentData);
           if (paymentData.amount !== amount) {
+            console.error(
+              "Amount mismatch:",
+              "URL:",
+              amount,
+              "Saved:",
+              paymentData.amount
+            );
             setConfirmationError(
               "결제 금액이 일치하지 않습니다. 보안상의 이유로 결제를 취소합니다."
             );
             setIsConfirming(false);
+            navigate(
+              "/payment/fail?code=AMOUNT_MISMATCH&message=결제 금액이 일치하지 않습니다."
+            );
+            return;
+          }
+          if (paymentData.orderId !== orderId) {
+            console.error("OrderId mismatch between URL and saved data");
+            setConfirmationError("주문번호가 일치하지 않습니다.");
+            setIsConfirming(false);
+            navigate(
+              "/payment/fail?code=ORDER_ID_MISMATCH&message=주문번호가 일치하지 않습니다."
+            );
             return;
           }
         } catch (e) {
           console.warn("Failed to parse saved payment data for validation");
         }
+      } else {
+        console.warn("No saved payment data found for orderId:", orderId);
+        // This might indicate the payment process was interrupted
       }
 
       try {
@@ -167,51 +215,96 @@ const PaymentSuccessPage = () => {
             reservationCompleted: !!reservationCompleteResult,
           });
         } catch (confirmError) {
-          // If backend API is not implemented, create mock success data
-          console.warn(
-            "Payment confirmation API not implemented, using mock data:",
-            confirmError
-          );
+          console.error("Payment confirmation failed:", confirmError);
 
-          // Try to complete reservation with fallback data
-          // Get reservation ID from localStorage or generate fallback
-          const savedPaymentData = localStorage.getItem(
-            `payment_data_${orderId}`
-          );
-          let reservationId = null;
+          // Check if this is a real payment error (400, 500) or just API not implemented (404)
+          const httpStatus = confirmError.status || confirmError.httpStatus;
+          const isRealError =
+            httpStatus === 400 ||
+            httpStatus === 500 ||
+            confirmError.message?.includes("잘못된 orderId") ||
+            confirmError.message?.includes("서버 내부 오류") ||
+            confirmError.message?.includes("Bad Request") ||
+            confirmError.message?.includes("Internal Server Error");
 
-          if (savedPaymentData) {
-            try {
-              const paymentData = JSON.parse(savedPaymentData);
-              reservationId = paymentData.reservationId;
-            } catch (e) {
-              console.warn("Failed to parse saved payment data");
-            }
+          if (isRealError) {
+            // Real payment error - redirect to fail page
+            console.log(
+              "Real payment error detected, redirecting to fail page"
+            );
+            console.log("Error details:", {
+              status: httpStatus,
+              message: confirmError.message,
+              isHttpError: confirmError.isHttpError,
+            });
+
+            navigate(
+              `/payment/fail?code=PAYMENT_CONFIRMATION_FAILED&message=${encodeURIComponent(
+                confirmError.message
+              )}`
+            );
+            return;
           }
 
-          let reservationCompleted = false;
-          if (reservationId) {
-            try {
-              console.log(
-                "Completing reservation with fallback:",
-                reservationId
-              );
-              await reservationService.completeReservation(reservationId);
-              reservationCompleted = true;
-              console.log("Reservation completed successfully");
-            } catch (reservationError) {
-              console.warn("Reservation completion failed:", reservationError);
-            }
-          }
+          // Only use fallback for 404 (API not implemented) errors
+          if (httpStatus === 404) {
+            console.warn(
+              "Payment confirmation API not implemented, using mock data:",
+              confirmError
+            );
 
-          setPaymentInfo({
-            orderId,
-            paymentKey,
-            amount,
-            status: "COMPLETED",
-            message: "결제가 성공적으로 완료되었습니다. (테스트 모드)",
-            reservationCompleted,
-          });
+            // Try to complete reservation with fallback data
+            // Get reservation ID from localStorage or generate fallback
+            const savedPaymentData = localStorage.getItem(
+              `payment_data_${orderId}`
+            );
+            let reservationId = null;
+
+            if (savedPaymentData) {
+              try {
+                const paymentData = JSON.parse(savedPaymentData);
+                reservationId = paymentData.reservationId;
+              } catch (e) {
+                console.warn("Failed to parse saved payment data");
+              }
+            }
+
+            let reservationCompleted = false;
+            if (reservationId) {
+              try {
+                console.log(
+                  "Completing reservation with fallback:",
+                  reservationId
+                );
+                await reservationService.completeReservation(reservationId);
+                reservationCompleted = true;
+                console.log("Reservation completed successfully");
+              } catch (reservationError) {
+                console.warn(
+                  "Reservation completion failed:",
+                  reservationError
+                );
+              }
+            }
+
+            setPaymentInfo({
+              orderId,
+              paymentKey,
+              amount,
+              status: "COMPLETED",
+              message: "결제가 성공적으로 완료되었습니다. (테스트 모드)",
+              reservationCompleted,
+            });
+          } else {
+            // Other errors - also redirect to fail page
+            console.log("Payment confirmation error, redirecting to fail page");
+            navigate(
+              `/payment/fail?code=PAYMENT_ERROR&message=${encodeURIComponent(
+                confirmError.message
+              )}`
+            );
+            return;
+          }
         }
 
         // Clean up localStorage

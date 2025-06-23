@@ -529,18 +529,32 @@ const BookingPage = () => {
     [selectedSeats.length]
   );
 
-  const holdSelectedSeats = useCallback(
-    async (seatIds) => {
-      if (!selectedScreening?.screeningId || seatIds.length === 0) return;
+  const holdNewSeats = useCallback(
+    async (newSeatIds) => {
+      if (!selectedScreening?.screeningId || newSeatIds.length === 0) return;
+
+      // Filter out seats that are already held
+      const seatsToHold = newSeatIds.filter(
+        (id) => !heldSeatsRef.current.includes(id)
+      );
+
+      if (seatsToHold.length === 0) {
+        console.log("No new seats to hold");
+        return;
+      }
 
       try {
+        console.log("Holding new seats:", seatsToHold);
         await reservationService.holdSeats({
           screeningId: selectedScreening.screeningId,
-          seatIds: seatIds,
+          seatIds: seatsToHold,
         });
-        heldSeatsRef.current = seatIds;
 
-        // Set timeout to release seats after 10 minutes
+        // Add new held seats to the current list
+        heldSeatsRef.current = [...heldSeatsRef.current, ...seatsToHold];
+        console.log("Currently held seats:", heldSeatsRef.current);
+
+        // Reset timeout for all held seats
         if (seatHoldTimeoutRef.current) {
           clearTimeout(seatHoldTimeoutRef.current);
         }
@@ -548,7 +562,7 @@ const BookingPage = () => {
           try {
             await reservationService.releaseSeats({
               screeningId: selectedScreening.screeningId,
-              seatIds: seatIds,
+              seatIds: heldSeatsRef.current,
             });
             heldSeatsRef.current = [];
             alert("좌석 선점 시간이 만료되었습니다. 다시 선택해주세요.");
@@ -558,8 +572,38 @@ const BookingPage = () => {
           }
         }, 10 * 60 * 1000); // 10 minutes
       } catch (error) {
-        console.error("Failed to hold seats:", error);
-        alert("좌석 선점에 실패했습니다. 다시 시도해주세요.");
+        console.error("Failed to hold new seats:", error);
+
+        // Handle specific 409 error
+        if (error.message?.includes("이미 선택된 좌석")) {
+          console.warn("Some seats are already held, trying to continue...");
+          // Don't show alert for this case, just log the warning
+        } else {
+          alert("좌석 선점에 실패했습니다. 다시 시도해주세요.");
+        }
+      }
+    },
+    [selectedScreening]
+  );
+
+  const releaseSpecificSeats = useCallback(
+    async (seatIds) => {
+      if (!selectedScreening?.screeningId || seatIds.length === 0) return;
+
+      try {
+        console.log("Releasing specific seats:", seatIds);
+        await reservationService.releaseSeats({
+          screeningId: selectedScreening.screeningId,
+          seatIds: seatIds,
+        });
+
+        // Remove released seats from held seats list
+        heldSeatsRef.current = heldSeatsRef.current.filter(
+          (id) => !seatIds.includes(id)
+        );
+        console.log("Remaining held seats:", heldSeatsRef.current);
+      } catch (error) {
+        console.error("Failed to release specific seats:", error);
       }
     },
     [selectedScreening]
@@ -604,31 +648,31 @@ const BookingPage = () => {
 
         // Hold or release seats based on selection
         if (newSeats.length > prev.length) {
-          // Seat added, hold all selected seats
-          const seatIdsToHold = newSeats.map((seat) =>
-            typeof seat === "string"
-              ? screeningSeatsData?.seats?.find((s) => s.seatNumber === seat)
-                  ?.seatId || seat
-              : seat
-          );
-          console.log("Holding seats:", seatIdsToHold);
-          holdSelectedSeats(seatIdsToHold);
+          // Seat added, hold only the new seat
+          const newSeatNumber = newSeats[newSeats.length - 1]; // Last added seat
+          const newSeatId =
+            typeof newSeatNumber === "string"
+              ? screeningSeatsData?.seats?.find(
+                  (s) => s.seatNumber === newSeatNumber
+                )?.seatId || newSeatNumber
+              : newSeatNumber;
+
+          console.log("Holding new seat:", newSeatId);
+          holdNewSeats([newSeatId]);
         } else if (newSeats.length < prev.length) {
-          // Seat removed, release and re-hold remaining seats
-          console.log("Releasing seats and re-holding remaining");
-          releaseSelectedSeats().then(() => {
-            if (newSeats.length > 0) {
-              const seatIdsToHold = newSeats.map((seat) =>
-                typeof seat === "string"
-                  ? screeningSeatsData?.seats?.find(
-                      (s) => s.seatNumber === seat
-                    )?.seatId || seat
-                  : seat
-              );
-              console.log("Re-holding seats:", seatIdsToHold);
-              holdSelectedSeats(seatIdsToHold);
-            }
-          });
+          // Seat removed, release only the removed seat
+          const removedSeat = prev.find((seat) => !newSeats.includes(seat));
+          if (removedSeat) {
+            const removedSeatId =
+              typeof removedSeat === "string"
+                ? screeningSeatsData?.seats?.find(
+                    (s) => s.seatNumber === removedSeat
+                  )?.seatId || removedSeat
+                : removedSeat;
+
+            console.log("Releasing removed seat:", removedSeatId);
+            releaseSpecificSeats([removedSeatId]);
+          }
         }
 
         return newSeats;
@@ -638,8 +682,8 @@ const BookingPage = () => {
       ticketCounts,
       selectedSeats,
       screeningSeatsData,
-      holdSelectedSeats,
-      releaseSelectedSeats,
+      holdNewSeats,
+      releaseSpecificSeats,
     ]
   );
 
