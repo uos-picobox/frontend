@@ -116,24 +116,44 @@ const TimeSelector = ({ screenings, selectedScreening, onScreeningSelect }) => {
               isActive={
                 selectedScreening?.screeningId === screening.screeningId
               }
-              disabled={screening.availableSeats <= 0} // Disable if no seats available
+              disabled={
+                (screening.availableSeatsCount ||
+                  screening.availableSeats ||
+                  0) <= 0
+              } // Disable if no seats available
               title={
-                screening.availableSeats <= 0
+                (screening.availableSeatsCount ||
+                  screening.availableSeats ||
+                  0) <= 0
                   ? "매진"
-                  : `${screening.availableSeats}석 남음`
+                  : `${
+                      screening.availableSeatsCount || screening.availableSeats
+                    }석 남음`
               }
             >
               <TimeText>
-                {formatTime(screening.screeningTime.substring(11, 16))}
+                {screening.screeningStartTime
+                  ? formatTime(screening.screeningStartTime)
+                  : screening.screeningTime
+                  ? screening.screeningTime.includes("T")
+                    ? formatTime(screening.screeningTime.substring(11, 16))
+                    : formatTime(screening.screeningTime)
+                  : "시간 미정"}
               </TimeText>
-              <RoomText>{screening.screeningRoom.roomName}</RoomText>
+              <RoomText>
+                {screening.roomName ||
+                  screening.screeningRoom?.roomName ||
+                  "상영관 미정"}
+              </RoomText>
               <SeatsText
                 isActive={
                   selectedScreening?.screeningId === screening.screeningId
                 }
               >
-                {screening.availableSeats > 0
-                  ? `${screening.availableSeats}석 남음`
+                {(screening.availableSeatsCount || screening.availableSeats) > 0
+                  ? `${
+                      screening.availableSeatsCount || screening.availableSeats
+                    }석 남음`
                   : "매진"}
               </SeatsText>
             </TimeButton>

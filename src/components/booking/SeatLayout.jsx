@@ -84,27 +84,57 @@ const LegendColorBox = styled.span`
 /**
  * SeatLayout Component
  * @param {object} props
- * @param {Array<Array<{id: string, status: string}>>} props.seatMatrix - 2D array of seat objects.
- * Each seat object: { id: 'A1', status: 'available' | 'booked' | 'selected' | 'reserved' | 'unavailable' }
- * @param {string[]} props.selectedSeats - Array of selected seat IDs.
- * @param {function} props.onSeatSelect - (seatId: string) => void.
+ * @param {Array<{seatId: number, seatNumber: string, status: string}>} props.seats - Array of seat objects from API
+ * @param {string[]} props.selectedSeats - Array of selected seat numbers/IDs.
+ * @param {function} props.onSeatSelect - (seatNumber: string) => void.
  * @param {number} props.totalTicketsSelected - Total number of tickets chosen by user.
  * @param {number} props.maxSeatsAllowedForSelection - Max seats user can select based on totalTicketsSelected.
  */
 const SeatLayout = ({
-  seatMatrix,
+  seats,
   selectedSeats,
   onSeatSelect,
   totalTicketsSelected,
   maxSeatsAllowedForSelection,
 }) => {
-  if (!seatMatrix || seatMatrix.length === 0) {
+  if (!seats || seats.length === 0) {
     return (
       <LayoutWrapper>
         <p>좌석 정보를 불러올 수 없습니다.</p>
       </LayoutWrapper>
     );
   }
+
+  // Convert seats array to matrix based on seat numbering pattern
+  // Assuming seat numbers are like "A1", "A2", "B1", "B2", etc.
+  const seatMatrix = [];
+  const rowMap = new Map();
+
+  // Group seats by row identifier (first character)
+  seats.forEach((seat) => {
+    const rowIdentifier = seat.seatNumber.charAt(0);
+    if (!rowMap.has(rowIdentifier)) {
+      rowMap.set(rowIdentifier, []);
+    }
+    rowMap.get(rowIdentifier).push({
+      id: seat.seatNumber,
+      seatId: seat.seatId,
+      status: seat.status.toLowerCase(),
+    });
+  });
+
+  // Sort rows alphabetically and seats within each row numerically
+  const sortedRows = Array.from(rowMap.entries()).sort(([a], [b]) =>
+    a.localeCompare(b)
+  );
+  sortedRows.forEach(([rowId, rowSeats]) => {
+    rowSeats.sort((a, b) => {
+      const numA = parseInt(a.id.slice(1));
+      const numB = parseInt(b.id.slice(1));
+      return numA - numB;
+    });
+    seatMatrix.push(rowSeats);
+  });
 
   const maxCols = seatMatrix.reduce((max, row) => Math.max(max, row.length), 0);
 
@@ -113,10 +143,7 @@ const SeatLayout = ({
       <ScreenIndicator>SCREEN</ScreenIndicator>
       <SeatGrid cols={maxCols}>
         {seatMatrix.map((row, rowIndex) => (
-          // <SeatRow key={`row-${rowIndex}`}> {/* If not using display: contents */}
-          // Using React.Fragment for display: contents compatibility
           <React.Fragment key={`row-${rowIndex}`}>
-            {/* Optional: Row Label <RowLabel>{String.fromCharCode(65 + rowIndex)}</RowLabel> */}
             {row.map((seat) => (
               <Seat
                 key={seat.id}

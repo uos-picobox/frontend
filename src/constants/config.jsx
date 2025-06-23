@@ -89,9 +89,19 @@ export const API_ENDPOINTS_USER = {
   // Public Movie & Screening APIs
   MOVIES_GET_ALL: `/api/movies`,
   MOVIE_GET_BY_ID: (movieId) => `/api/movies/${movieId}`,
-  SCREENINGS_GET_ALL: `/api/screenings`,
+
+  // New Screening APIs
+  SCREENINGS_GET_BY_DATE: (date) => `/api/screenings?date=${date}`,
   SCREENINGS_FOR_MOVIE_DATE: (movieId, date) =>
     `/api/movies/${movieId}/screenings?date=${date}`,
+  SCREENING_SEATS_GET: (screeningId) => `/api/screenings/${screeningId}/seats`,
+
+  // Reservation APIs
+  RESERVATIONS_MY: `/api/reservations/my-reservations`,
+  RESERVATIONS_HOLD: `/api/reservations/hold`,
+  RESERVATIONS_RELEASE: `/api/reservations/release`,
+  RESERVATIONS_CREATE: `/api/reservations/create`,
+  RESERVATIONS_COMPLETE: `/api/reservations/complete`,
 
   // Signup & Auth related
   SIGNUP: `/api/user/signup`,
