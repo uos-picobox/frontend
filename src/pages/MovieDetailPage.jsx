@@ -166,9 +166,11 @@ const MovieDetailPage = () => {
     return <ErrorMessageUI>영화 정보를 찾을 수 없습니다.</ErrorMessageUI>;
   }
 
-  const sortedScreeningsToday = screeningsToday.sort((a, b) =>
-    a.screeningTime.localeCompare(b.screeningTime)
-  );
+  const sortedScreeningsToday = screeningsToday.sort((a, b) => {
+    const timeA = a.screeningStartTime || a.screeningTime || "";
+    const timeB = b.screeningStartTime || b.screeningTime || "";
+    return timeA.localeCompare(timeB);
+  });
 
   return (
     <DetailPageWrapper>
@@ -184,12 +186,27 @@ const MovieDetailPage = () => {
               {sortedScreeningsToday.map((screening) => (
                 <ShowtimeCard key={screening.screeningId}>
                   <p className="time">
-                    {formatTime(screening.screeningTime.substring(11, 16))}
+                    {screening.screeningStartTime
+                      ? formatTime(screening.screeningStartTime)
+                      : screening.screeningTime
+                      ? screening.screeningTime.includes("T")
+                        ? formatTime(screening.screeningTime.substring(11, 16))
+                        : formatTime(screening.screeningTime)
+                      : "시간 미정"}
                   </p>
-                  <p className="room">{screening.screeningRoom.roomName}</p>
+                  <p className="room">
+                    {screening.roomName ||
+                      screening.screeningRoom?.roomName ||
+                      "상영관 미정"}
+                  </p>
                   <p className="seats">
-                    {screening.availableSeats > 0
-                      ? `${screening.availableSeats}석 남음`
+                    {(screening.availableSeatsCount ||
+                      screening.availableSeats ||
+                      0) > 0
+                      ? `${
+                          screening.availableSeatsCount ||
+                          screening.availableSeats
+                        }석 남음`
                       : "매진"}
                   </p>
                 </ShowtimeCard>

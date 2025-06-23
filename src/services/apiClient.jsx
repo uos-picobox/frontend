@@ -2,22 +2,57 @@
 import { API_BASE_URL } from "../constants/config";
 
 const getSessionId = () => {
-  return localStorage.getItem("sessionId");
+  const sessionId = localStorage.getItem("sessionId");
+  if (process.env.NODE_ENV === "development") {
+    console.log(
+      "apiClient: getSessionId() returning:",
+      sessionId ? `${sessionId.substring(0, 10)}...` : null
+    );
+  }
+  return sessionId;
+};
+
+const getKoreanErrorMessage = (status) => {
+  switch (status) {
+    case 400:
+      return "잘못된 요청입니다.";
+    case 401:
+      return "인증되지 않은 사용자입니다.";
+    case 403:
+      return "접근 권한이 없습니다.";
+    case 404:
+      return "요청한 리소스를 찾을 수 없습니다.";
+    case 409:
+      return "충돌이 발생했습니다.";
+    case 422:
+      return "입력 데이터에 오류가 있습니다.";
+    case 500:
+      return "서버 내부 오류가 발생했습니다. 관리자에게 문의해주세요.";
+    case 502:
+      return "서버 연결에 문제가 있습니다.";
+    case 503:
+      return "서비스를 일시적으로 사용할 수 없습니다.";
+    default:
+      return `API 오류가 발생했습니다 (${status}).`;
+  }
 };
 
 const handleResponse = async (response) => {
   if (!response.ok) {
-    let errorMessage = `API Error: ${response.status} ${response.statusText}`;
+    let errorMessage = getKoreanErrorMessage(response.status);
     let errorDetails = null;
+
     try {
       const errorData = await response.json();
+      // 서버에서 제공하는 한국어 메시지가 있으면 우선 사용
       errorMessage = errorData.message || errorData.error || errorMessage;
+
       if (errorData.errors && Array.isArray(errorData.errors)) {
         // Collecting specific field errors if available
         errorDetails = errorData.errors
           .map((e) => `${e.field}: ${e.defaultMessage || e.reason}`)
           .join(", ");
-        errorMessage += ` Details: ${errorDetails}`;
+        errorMessage += ` 상세: ${errorDetails}`;
       }
       // If errorData itself is the detail (e.g. for Spring validation errors)
       if (
@@ -31,6 +66,25 @@ const handleResponse = async (response) => {
     } catch (e) {
       // Ignore if response body is not JSON or empty
     }
+
+    // 401 오류 시 세션 정리 (자동 로그아웃) - 하지만 즉시 리다이렉트는 하지 않음
+    if (response.status === 401) {
+      console.warn("apiClient: 401 Unauthorized - clearing session data");
+      localStorage.removeItem("sessionId");
+      localStorage.removeItem("sessionExpiresAt");
+      localStorage.removeItem("userData");
+      localStorage.removeItem("adminData");
+
+      // 쿠키도 정리
+      document.cookie =
+        "sessionId=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+
+      // 즉시 리다이렉트하지 않고 에러를 throw하여 컴포넌트에서 처리하도록 함
+      console.warn(
+        "apiClient: Session cleared, component should handle the error"
+      );
+    }
+
     const error = new Error(errorMessage);
     error.status = response.status;
     error.details = errorDetails; // Attach more details if parsed
@@ -40,12 +94,32 @@ const handleResponse = async (response) => {
     // No Content
     return null;
   }
+
   // Check if response is JSON before trying to parse
   const contentType = response.headers.get("content-type");
   if (contentType && contentType.indexOf("application/json") !== -1) {
-    return response.json();
+    const jsonData = await response.json();
+    console.log("apiClient: JSON response received:", jsonData);
+    return jsonData;
   } else {
-    return response.text(); // Or handle as blob, etc., if needed
+    const textData = await response.text();
+    console.log("apiClient: Text response received:", textData);
+
+    // 텍스트 응답이 빈 문자열인 경우 null 반환
+    if (!textData || textData.trim() === "") {
+      console.warn("apiClient: Empty text response received");
+      return null;
+    }
+
+    // JSON 형태의 문자열인지 확인하고 파싱 시도
+    try {
+      const parsed = JSON.parse(textData);
+      console.log("apiClient: Successfully parsed text as JSON:", parsed);
+      return parsed;
+    } catch (e) {
+      console.log("apiClient: Text response is not JSON, returning as string");
+      return textData;
+    }
   }
 };
 
@@ -55,8 +129,17 @@ const apiClient = {
     const headers = {
       // 'Content-Type': 'application/json', // Not needed for GET usually
     };
+
+    // 여러 인증 방식으로 헤더 설정
     if (sessionId) {
+      // 1. Authorization Bearer 헤더 (가장 일반적)
+      headers["Authorization"] = `${sessionId}`;
+      // 2. 커스텀 sessionId 헤더 (기존 방식 유지)
       headers["sessionId"] = sessionId;
+      // 3. X-Session-ID 헤더 (일부 백엔드에서 사용)
+      headers["X-Session-ID"] = sessionId;
+    } else {
+      console.warn("apiClient GET: No sessionId found for endpoint:", endpoint);
     }
 
     let url = `${API_BASE_URL}${endpoint}`;
@@ -73,15 +156,40 @@ const apiClient = {
       }
     }
 
-    const response = await fetch(url, { method: "GET", headers });
+    console.log("apiClient GET:", {
+      url: url,
+      headers: headers,
+      hasSessionId: !!sessionId,
+    });
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers,
+      credentials: "include", // 쿠키 포함
+    });
+
+    console.log("apiClient GET response:", {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      url: url,
+    });
+
     return handleResponse(response);
   },
 
   post: async (endpoint, data, isFormData = false) => {
     const sessionId = getSessionId();
     const headers = {};
+
+    // 여러 인증 방식으로 헤더 설정
     if (sessionId) {
+      // 1. Authorization Bearer 헤더 (가장 일반적)
+      headers["Authorization"] = `${sessionId}`;
+      // 2. 커스텀 sessionId 헤더 (기존 방식 유지)
       headers["sessionId"] = sessionId;
+      // 3. X-Session-ID 헤더 (일부 백엔드에서 사용)
+      headers["X-Session-ID"] = sessionId;
     }
 
     let body;
@@ -105,6 +213,7 @@ const apiClient = {
       method: "POST",
       headers,
       body,
+      credentials: "include", // 쿠키 포함
     });
 
     console.log("apiClient POST response:", {
@@ -120,8 +229,15 @@ const apiClient = {
   put: async (endpoint, data, isFormData = false) => {
     const sessionId = getSessionId();
     const headers = {};
+
+    // 여러 인증 방식으로 헤더 설정
     if (sessionId) {
+      // 1. Authorization Bearer 헤더 (가장 일반적)
+      headers["Authorization"] = `${sessionId}`;
+      // 2. 커스텀 sessionId 헤더 (기존 방식 유지)
       headers["sessionId"] = sessionId;
+      // 3. X-Session-ID 헤더 (일부 백엔드에서 사용)
+      headers["X-Session-ID"] = sessionId;
     }
 
     let body;
@@ -136,6 +252,7 @@ const apiClient = {
       method: "PUT",
       headers,
       body,
+      credentials: "include", // 쿠키 포함
     });
     return handleResponse(response);
   },
@@ -146,13 +263,21 @@ const apiClient = {
     const headers = {
       // 'Content-Type': 'application/json', // Only if body is present and JSON
     };
+
+    // 여러 인증 방식으로 헤더 설정
     if (sessionId) {
+      // 1. Authorization Bearer 헤더 (가장 일반적)
+      headers["Authorization"] = `${sessionId}`;
+      // 2. 커스텀 sessionId 헤더 (기존 방식 유지)
       headers["sessionId"] = sessionId;
+      // 3. X-Session-ID 헤더 (일부 백엔드에서 사용)
+      headers["X-Session-ID"] = sessionId;
     }
 
     const config = {
       method: "DELETE",
       headers,
+      credentials: "include", // 쿠키 포함
     };
 
     if (data) {

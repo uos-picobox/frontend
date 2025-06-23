@@ -2,16 +2,15 @@
 import apiClient from "./apiClient";
 import {
   API_ENDPOINTS_ADMIN,
-  API_ENDPOINTS_USER,
+  API_ENDPOINTS_CUSTOMER,
   ensureArray,
-} from "../constants/config"; // API_ENDPOINTS_USER 추가 (공개 API용)
-import { mockPublicScreenings } from "../constants/mockData";
+} from "../constants/config"; // API_ENDPOINTS_CUSTOMER 추가 (공개 API용)
 
 // --- Public/User Facing (Using Real API) ---
 /**
  * Fetches all screenings for a specific date for user display using REAL API.
  * @param {string} date - Date in 'YYYY-MM-DD' format
- * @returns {Promise<ScreeningResponseDto[]>}
+ * @returns {Promise<Array>}
  */
 export const getPublicScreeningsByDate = async (date) => {
   console.log(
@@ -19,8 +18,7 @@ export const getPublicScreeningsByDate = async (date) => {
   );
   try {
     const screeningsData = await apiClient.get(
-      API_ENDPOINTS_USER.SCREENINGS_GET_ALL,
-      { date }
+      API_ENDPOINTS_CUSTOMER.SCREENINGS_GET_BY_DATE(date)
     );
     return ensureArray(screeningsData);
   } catch (error) {
@@ -28,12 +26,7 @@ export const getPublicScreeningsByDate = async (date) => {
       `screeningService: getPublicScreeningsByDate error for date ${date}:`,
       error
     );
-    // Fallback to mock data if API fails
-    console.log("Falling back to mock data");
-    const filteredScreenings = mockPublicScreenings.filter(
-      (s) => s.screeningDate === date
-    );
-    return JSON.parse(JSON.stringify(filteredScreenings));
+    throw error;
   }
 };
 
@@ -41,7 +34,7 @@ export const getPublicScreeningsByDate = async (date) => {
  * Fetches screenings for a specific movie on a specific date for user display using REAL API.
  * @param {number|string} movieId
  * @param {string} date - Date in 'YYYY-MM-DD' format
- * @returns {Promise<ScreeningResponseDto[]>}
+ * @returns {Promise<Array>}
  */
 export const getPublicScreeningsForMovieDate = async (movieId, date) => {
   console.log(
@@ -49,7 +42,7 @@ export const getPublicScreeningsForMovieDate = async (movieId, date) => {
   );
   try {
     const screeningsData = await apiClient.get(
-      API_ENDPOINTS_USER.SCREENINGS_FOR_MOVIE_DATE(movieId, date)
+      API_ENDPOINTS_CUSTOMER.SCREENINGS_FOR_MOVIE_DATE(movieId, date)
     );
     return ensureArray(screeningsData);
   } catch (error) {
@@ -57,14 +50,53 @@ export const getPublicScreeningsForMovieDate = async (movieId, date) => {
       `screeningService: getPublicScreeningsForMovieDate error for movie ${movieId}, date ${date}:`,
       error
     );
-    // Fallback to mock data if API fails
-    console.log("Falling back to mock data");
-    const filteredScreenings = mockPublicScreenings.filter(
-      (s) =>
-        s.movie.movieId.toString() === movieId.toString() &&
-        s.screeningDate === date
+    throw error;
+  }
+};
+
+/**
+ * Fetches seat information for a specific screening
+ * @param {number|string} screeningId
+ * @returns {Promise<Object>}
+ */
+export const getScreeningSeats = async (screeningId) => {
+  console.log(
+    `screeningService: getScreeningSeats called for screening ${screeningId}`
+  );
+  try {
+    const seatData = await apiClient.get(
+      API_ENDPOINTS_CUSTOMER.SCREENING_SEATS_GET(screeningId)
     );
-    return JSON.parse(JSON.stringify(filteredScreenings));
+    return seatData;
+  } catch (error) {
+    console.error(
+      `screeningService: getScreeningSeats error for screening ${screeningId}:`,
+      error
+    );
+    throw error;
+  }
+};
+
+/**
+ * Fetches ticket prices for a specific screening
+ * @param {number|string} screeningId
+ * @returns {Promise<Object>}
+ */
+export const getScreeningTicketPrices = async (screeningId) => {
+  console.log(
+    `screeningService: getScreeningTicketPrices called for screening ${screeningId}`
+  );
+  try {
+    const priceData = await apiClient.get(
+      API_ENDPOINTS_CUSTOMER.SCREENING_TICKET_PRICES(screeningId)
+    );
+    return priceData;
+  } catch (error) {
+    console.error(
+      `screeningService: getScreeningTicketPrices error for screening ${screeningId}:`,
+      error
+    );
+    throw error;
   }
 };
 

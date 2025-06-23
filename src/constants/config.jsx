@@ -85,23 +85,92 @@ export const API_ENDPOINTS_ADMIN = {
     `/api/admin/price-settings/delete?roomId=${roomId}&ticketTypeId=${ticketTypeId}`,
 };
 
-export const API_ENDPOINTS_USER = {
+export const API_ENDPOINTS_CUSTOMER = {
   // Public Movie & Screening APIs
   MOVIES_GET_ALL: `/api/movies`,
   MOVIE_GET_BY_ID: (movieId) => `/api/movies/${movieId}`,
-  SCREENINGS_GET_ALL: `/api/screenings`,
+
+  // Public Actor API
+  ACTOR_GET_BY_ID: (actorId) => `/api/actors/get/${actorId}`,
+
+  // New Screening APIs
+  SCREENINGS_GET_BY_DATE: (date) => `/api/screenings?date=${date}`,
   SCREENINGS_FOR_MOVIE_DATE: (movieId, date) =>
     `/api/movies/${movieId}/screenings?date=${date}`,
+  SCREENING_SEATS_GET: (screeningId) => `/api/screenings/${screeningId}/seats`,
+  SCREENING_TICKET_PRICES: (screeningId) =>
+    `/api/screenings/${screeningId}/ticket-prices`,
 
-  // Signup & Auth related
-  SIGNUP: `/api/user/signup`,
+  // Reservation APIs
+  RESERVATIONS_MY: `/api/protected/reservations/my-reservations`,
+  RESERVATIONS_DETAIL: (reservationId) =>
+    `/api/protected/reservations/${reservationId}`,
+  RESERVATIONS_TICKET: (reservationId) =>
+    `/api/protected/reservations/${reservationId}/ticket`,
+  RESERVATIONS_HOLD: `/api/protected/reservations/hold`,
+  RESERVATIONS_RELEASE: `/api/protected/reservations/release`,
+  RESERVATIONS_CREATE: `/api/protected/reservations/create`,
+  RESERVATIONS_COMPLETE: (reservationId) =>
+    `/api/protected/reservations/complete/${reservationId}`,
+  RESERVATIONS_CANCEL: `/api/protected/reservations/cancel`,
+
+  // Point APIs
+  POINT_BALANCE: `/api/protected/get/point`,
+  POINT_HISTORY: `/api/protected/get/point-history`,
+
+  // Payment APIs
+  PAYMENT_HISTORY: `/api/protected/payment/get`, // 특정 예약의 결제 정보 (reservationId 필수)
+  PAYMENT_HISTORY_ALL: `/api/protected/payments/my-payments`, // 전체 결제 내역 (미구현)
+  PAYMENT_DISCOUNT_LIST: `/api/payment-discount/get`,
+  PAYMENT_BEFORE: `/api/protected/payment/before`,
+  PAYMENT_CONFIRM: `/api/protected/payment/confirm`,
+
+  // Customer Auth APIs
+  LOGIN: `/api/signin/customer`,
+  LOGOUT: `/api/signout/customer`,
+  SIGNUP: `/api/signup/customer`,
   SIGNUP_CHECK_LOGINID: (loginId) =>
-    `/api/user/signup/check/loginid?loginId=${loginId}`,
-  SIGNUP_CHECK_EMAIL: (email) => `/api/user/signup/check/email?email=${email}`,
-  SIGNUP_REQUEST_EMAIL_VERIFICATION: `/api/user/signup/verify/email`,
-  SIGNUP_AUTH_EMAIL_CODE: `/api/user/signup/auth/email`,
-  LOGIN: `/api/user/signin`, // Updated to new signin endpoint
-  LOGOUT: `/api/user/signout`, // New signout endpoint
+    `/api/signup/customer/check/loginid?loginId=${loginId}`,
+  SIGNUP_CHECK_EMAIL: (email) =>
+    `/api/signup/customer/check/email?email=${email}`,
+  SIGNUP_REQUEST_EMAIL_VERIFICATION: `/api/signup/customer/verify/email`,
+  SIGNUP_AUTH_EMAIL_CODE: `/api/signup/customer/auth/email`,
+
+  // Customer Profile APIs
+  GET_MY_INFO: `/api/protected/customer/get`,
+  UPDATE_MY_INFO: `/api/protected/customer/update`,
+
+  // Password Reset APIs
+  FIND_PASSWORD_VERIFY_EMAIL: `/api/customer/find/password/verify/email`,
+  FIND_PASSWORD_AUTH_EMAIL: `/api/customer/find/password/auth/email`,
+  FIND_PASSWORD_RESET: `/api/customer/find/password/reset`,
+
+  // Find Login ID APIs
+  FIND_LOGINID_VERIFY_EMAIL: `/api/customer/find/login-id/verify/email`,
+  FIND_LOGINID_AUTH_EMAIL: `/api/customer/find/login-id/auth/email`,
+};
+
+export const API_ENDPOINTS_GUEST = {
+  // Guest Auth APIs
+  LOGIN: `/api/signin/guest`,
+  LOGOUT: `/api/signout/guest`,
+  SIGNUP: `/api/signup/guest`,
+  SIGNUP_CHECK_EMAIL: (email) => `/api/signup/guest/check/email?email=${email}`,
+  SIGNUP_REQUEST_EMAIL_VERIFICATION: `/api/signup/guest/verify/email`,
+  SIGNUP_AUTH_EMAIL_CODE: `/api/signup/guest/auth/email`,
+};
+
+export const API_ENDPOINTS_ADMIN_AUTH = {
+  // Admin Auth APIs
+  LOGIN: `/api/signin/admin`,
+  LOGOUT: `/api/signout/admin`,
+  SIGNUP: `/api/signup/admin`,
+  SIGNUP_CHECK_LOGINID: (loginId) =>
+    `/api/signup/admin/check/loginid?loginId=${loginId}`,
+  SIGNUP_CHECK_EMAIL: (email) => `/api/signup/admin/check/email?email=${email}`,
+  SIGNUP_REQUEST_EMAIL_VERIFICATION: `/api/signup/admin/verify/email`,
+  SIGNUP_AUTH_EMAIL_CODE: `/api/signup/admin/auth/email`,
+  DELETE_ACCOUNT: `/api/admin/delete/account`,
 };
 
 // --- UI Constants & Fallbacks ---
@@ -114,6 +183,17 @@ export const TICKET_PRICES_FALLBACK = {
 };
 
 export const MAX_SEATS_PER_BOOKING = 8;
+
+// Toss Payments Configuration
+export const TOSS_PAYMENTS_CONFIG = {
+  CLIENT_KEY: "test_ck_26DlbXAaV07qqeZgpLzd3qY50Q9R",
+  get SUCCESS_URL() {
+    return `${window.location.origin}/payment/success`;
+  },
+  get FAIL_URL() {
+    return `${window.location.origin}/payment/fail`;
+  },
+};
 
 export const PLACEHOLDER_POSTER_URL = (
   width = 300,

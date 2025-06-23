@@ -95,51 +95,52 @@ const WarningText = styled.p`
 /**
  * TicketCounter Component
  * @param {object} props
- * @param {object} props.ticketCounts - e.g., { ADULT: 0, TEEN: 0, CHILD: 0 } (keys should match ticketType.typeName or ID)
- * @param {function} props.onTicketCountChange - (typeIdentifier: string, delta: number) => void
- * @param {PriceSettingResponseDto[]} props.priceSettings - Price settings for the current room/screening.
+ * @param {object} props.ticketCounts - e.g., { 1: 0, 2: 0, 3: 0 } (keys are ticketTypeId)
+ * @param {function} props.onTicketCountChange - (ticketTypeId: number, delta: number) => void
+ * @param {TicketTypeResponseDto[]|Array} props.ticketTypes - Available ticket types or screening ticket prices
  * @param {number} props.maxTotalTickets - Maximum total tickets allowed (e.g., 8)
  * @param {number} props.selectedSeatsCount - Number of currently selected seats
+ * @param {boolean} props.useActualPrices - Whether to use actual prices from screening data
  */
 const TicketCounter = ({
   ticketCounts,
   onTicketCountChange,
-  priceSettings,
+  ticketTypes,
   maxTotalTickets = 8,
   selectedSeatsCount,
+  useActualPrices = false,
 }) => {
-  const { ticketTypes, isLoadingData, dataError } = useData(); // Get globally fetched ticket types
-
   // Create a combined list of ticket types with their prices for the current context
   const displayableTicketTypes = (ticketTypes || [])
     .map((tt) => {
-      const setting = priceSettings?.find(
-        (ps) => ps.ticketTypeId === tt.ticketTypeId
-      );
-      return {
-        id: tt.ticketTypeId, // Use ID for internal mapping
-        identifier: tt.typeName.toUpperCase(), // Use a consistent identifier like "ADULT"
-        name: tt.typeName,
-        description: tt.description,
-        // Use price from settings if available, otherwise a fallback or indicate not available
-        price: setting
-          ? setting.price
-          : TICKET_PRICES_FALLBACK[tt.typeName.toLowerCase()] || 0,
-        isPriceAvailable: !!setting,
-      };
+      if (useActualPrices && tt.price) {
+        // Using screening ticket prices (has price property)
+        return {
+          id: tt.ticketTypeId,
+          name: tt.typeName,
+          description: tt.description || "",
+          price: tt.price,
+        };
+      } else {
+        // Using global ticket types (fallback pricing)
+        return {
+          id: tt.ticketTypeId,
+          name: tt.typeName,
+          description: tt.description,
+          // Use fallback price based on ticket type name
+          price:
+            TICKET_PRICES_FALLBACK[tt.typeName?.toLowerCase()] ||
+            TICKET_PRICES_FALLBACK.adult,
+        };
+      }
     })
-    .sort((a, b) => a.id - b.id); // Ensure consistent order (e.g., Adult, Teen, Child)
+    .sort((a, b) => a.id - b.id); // Ensure consistent order
 
   const totalSelectedTickets = Object.values(ticketCounts).reduce(
     (sum, count) => sum + count,
     0
   );
 
-  if (isLoadingData) return <p>티켓 정보 로딩 중...</p>;
-  if (dataError && (!ticketTypes || ticketTypes.length === 0))
-    return (
-      <ErrorText>티켓 종류를 불러오는데 실패했습니다: {dataError}</ErrorText>
-    );
   if (!displayableTicketTypes.length)
     return <p>현재 예매 가능한 티켓 종류가 없습니다.</p>;
 
@@ -150,27 +151,20 @@ const TicketCounter = ({
         <TicketTypeRow key={type.id}>
           <TicketInfo>
             <span>{type.name}</span>
-            {type.isPriceAvailable ? (
-              <span>({type.price.toLocaleString()}원)</span>
-            ) : (
-              <span>(가격 정보 없음)</span>
-            )}
+            <span>({type.price.toLocaleString()}원)</span>
           </TicketInfo>
           <CountControls>
             <ControlButton
-              onClick={() => onTicketCountChange(type.identifier, -1)}
-              disabled={ticketCounts[type.identifier] === 0}
+              onClick={() => onTicketCountChange(type.id, -1)}
+              disabled={ticketCounts[type.id] === 0}
               aria-label={`${type.name} 한 명 줄이기`}
             >
               <MinusCircle />
             </ControlButton>
-            <CountDisplay>{ticketCounts[type.identifier] || 0}</CountDisplay>
+            <CountDisplay>{ticketCounts[type.id] || 0}</CountDisplay>
             <ControlButton
-              onClick={() => onTicketCountChange(type.identifier, 1)}
-              disabled={
-                totalSelectedTickets >= maxTotalTickets ||
-                !type.isPriceAvailable
-              }
+              onClick={() => onTicketCountChange(type.id, 1)}
+              disabled={totalSelectedTickets >= maxTotalTickets}
               aria-label={`${type.name} 한 명 늘리기`}
             >
               <PlusCircle />

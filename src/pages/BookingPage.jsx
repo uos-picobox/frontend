@@ -1,5 +1,5 @@
 // src/pages/BookingPage.js
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import styled from "styled-components";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import DateSelector from "../components/booking/DateSelector";
@@ -7,30 +7,27 @@ import TimeSelector from "../components/booking/TimeSelector";
 import TicketCounter from "../components/booking/TicketCounter";
 import SeatLayout from "../components/booking/SeatLayout";
 import Button from "../components/common/Button";
+import PaymentSection from "../components/booking/PaymentSection";
 import { ChevronLeft } from "lucide-react";
+// Toss Payments는 전역 스크립트로 로드됨
 
 import * as movieService from "../services/movieService";
 import * as screeningService from "../services/screeningService";
-import * as roomService from "../services/roomService"; // For public room data
-import * as priceService from "../services/priceService"; // For public price data
+import * as reservationService from "../services/reservationService";
+import * as paymentService from "../services/paymentService";
 import { useData } from "../contexts/DataContext";
 import useAuth from "../hooks/useAuth";
 import { getTodayDateString, formatDate, formatTime } from "../utils/dateUtils";
-import { generateSeatLayout as generateSeatMatrixUtil } from "../utils/seatUtils";
 import {
   TICKET_PRICES_FALLBACK,
   MAX_SEATS_PER_BOOKING,
+  TOSS_PAYMENTS_CONFIG,
 } from "../constants/config";
-import {
-  mockPublicScreeningRooms,
-  mockPublicTicketTypes,
-  mockPublicPriceSettings,
-  generateMockSeatLayout,
-} from "../constants/mockData"; // For detailed mock seat layout
 
 const BookingPageWrapper = styled.div`
   background-color: ${({ theme }) => theme.colors.surface};
   padding: ${({ theme }) => theme.spacing[4]};
+  margin-bottom: ${({ theme }) => theme.spacing[12]};
   border-radius: ${({ theme }) => theme.borderRadius.xl};
   box-shadow: ${({ theme }) => theme.shadows.lg};
   margin-top: ${({ theme }) => theme.spacing[6]};
@@ -97,6 +94,7 @@ const SummarySection = styled.div`
       color: ${({ theme }) => theme.colors.text};
     }
   }
+  margin-bottom: ${({ theme }) => theme.spacing[6]};
 `;
 const TotalPriceDisplay = styled.div`
   border-top: 1px solid ${({ theme }) => theme.colors.border};
@@ -121,16 +119,89 @@ const LoadingErrorDisplay = styled.p`
     $isError ? theme.colors.error : theme.colors.textLighter};
 `;
 
+const LoginSelectionOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: ${({ theme }) => theme.spacing[4]};
+`;
+
+const LoginSelectionModal = styled.div`
+  background-color: ${({ theme }) => theme.colors.surface};
+  padding: ${({ theme }) => theme.spacing[6]};
+  border-radius: ${({ theme }) => theme.borderRadius.xl};
+  box-shadow: ${({ theme }) => theme.shadows.lg};
+  max-width: 450px;
+  width: 100%;
+  text-align: center;
+`;
+
+const LoginSelectionTitle = styled.h3`
+  font-size: ${({ theme }) => theme.fontSizes.xl};
+  color: ${({ theme }) => theme.colors.primaryLight};
+  margin-bottom: ${({ theme }) => theme.spacing[4]};
+`;
+
+const LoginSelectionText = styled.p`
+  color: ${({ theme }) => theme.colors.textDark};
+  margin-bottom: ${({ theme }) => theme.spacing[6]};
+  font-size: ${({ theme }) => theme.fontSizes.base};
+`;
+
+const LoginButtonsContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing[3]};
+  margin-bottom: ${({ theme }) => theme.spacing[4]};
+`;
+
+const LoginOptionButton = styled(Button)`
+  padding: ${({ theme }) => theme.spacing[3]} ${({ theme }) => theme.spacing[4]};
+  font-size: ${({ theme }) => theme.fontSizes.base};
+
+  &.member {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    color: white;
+
+    &:hover {
+      background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+    }
+  }
+
+  &.guest {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    border: none;
+    color: white;
+
+    &:hover {
+      background: linear-gradient(135deg, #e081e9 0%, #e3475a 100%);
+    }
+  }
+`;
+
+const CancelButton = styled(Button).attrs({ variant: "outline" })`
+  color: ${({ theme }) => theme.colors.textDark};
+`;
+
 const BookingPage = () => {
   const { movieId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
-  // DataContext provides admin-fetched ticket types. For public, we use mockPublicTicketTypes.
-  // const { ticketTypes: globalTicketTypesFromAdminContext, isLoadingData: isLoadingGlobalData } = useData();
-  const [publicTicketTypes, setPublicTicketTypes] = useState(
-    mockPublicTicketTypes
-  ); // Use our mock for public
+  const { ticketTypes: globalTicketTypes } = useData();
+
+  // Seat hold timeout ref
+  const seatHoldTimeoutRef = useRef(null);
+  const heldSeatsRef = useRef([]);
+  const currentReservationRef = useRef(null);
 
   const [movieDetails, setMovieDetails] = useState(
     location.state?.movie || null
@@ -139,32 +210,29 @@ const BookingPage = () => {
   const [selectedDate, setSelectedDate] = useState(getTodayDateString());
   const [availableScreenings, setAvailableScreenings] = useState([]);
   const [selectedScreening, setSelectedScreening] = useState(null);
+  const [screeningSeatsData, setScreeningSeatsData] = useState(null);
+  const [screeningTicketPrices, setScreeningTicketPrices] = useState(null);
 
-  const [priceSettingsForRoom, setPriceSettingsForRoom] = useState([]);
   const [ticketCounts, setTicketCounts] = useState({});
-
-  const [seatMatrix, setSeatMatrix] = useState([]);
-  const [bookedSeatsForScreening, setBookedSeatsForScreening] = useState([]);
   const [selectedSeats, setSelectedSeats] = useState([]);
 
-  const [isLoading, setIsLoading] = useState(false);
-  const [pageError, setPageError] = useState(null); // Renamed from error to avoid conflict
+  // Payment related states
+  const [paymentData, setPaymentData] = useState(null);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
+  // Login selection states
+  const [showLoginSelection, setShowLoginSelection] = useState(false);
+  const [pendingScreening, setPendingScreening] = useState(null);
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [pageError, setPageError] = useState(null);
+
+  // Load movie details if not provided
   useEffect(() => {
     if (!movieDetails && movieId) {
       setIsLoading(true);
       movieService
-        .getPublicMovieById(movieId) // Use public mock service
-        .then((data) => setMovieDetails(data))
-        .catch((err) => {
-          setPageError("영화 정보를 불러오는데 실패했습니다.");
-          console.error(err);
-        })
-        .finally(() => setIsLoading(false));
-    } else if (movieDetails && movieDetails.movieId?.toString() !== movieId) {
-      setIsLoading(true);
-      movieService
-        .getPublicMovieById(movieId) // Use public mock service
+        .getPublicMovieById(movieId)
         .then((data) => setMovieDetails(data))
         .catch((err) => {
           setPageError("영화 정보를 불러오는데 실패했습니다.");
@@ -174,16 +242,27 @@ const BookingPage = () => {
     }
   }, [movieId, movieDetails]);
 
+  // Initialize ticket counts when ticket types are available
   useEffect(() => {
-    if (publicTicketTypes && publicTicketTypes.length > 0) {
+    if (globalTicketTypes && globalTicketTypes.length > 0) {
       const initialCounts = {};
-      publicTicketTypes.forEach((tt) => {
-        initialCounts[tt.typeName.toUpperCase().replace(" (MOCK)", "")] = 0; // Key from mock data
+      globalTicketTypes.forEach((tt) => {
+        initialCounts[tt.ticketTypeId] = 0;
       });
       setTicketCounts(initialCounts);
     }
-  }, [publicTicketTypes]);
+  }, [globalTicketTypes]);
 
+  // Handle login completion - set pending screening if user logged in
+  useEffect(() => {
+    if (user && pendingScreening) {
+      setSelectedScreening(pendingScreening);
+      setPendingScreening(null);
+      setShowLoginSelection(false);
+    }
+  }, [user, pendingScreening]);
+
+  // Load screenings when movie and date are selected
   useEffect(() => {
     if (movieDetails && movieDetails.movieId && selectedDate) {
       const fetchScreenings = async () => {
@@ -193,10 +272,10 @@ const BookingPage = () => {
           const data = await screeningService.getPublicScreeningsForMovieDate(
             movieDetails.movieId,
             selectedDate
-          ); // Use public mock
+          );
           setAvailableScreenings(data || []);
           setSelectedScreening(null);
-          setSeatMatrix([]);
+          setScreeningSeatsData(null);
           setSelectedSeats([]);
         } catch (err) {
           setPageError("상영 정보 로딩 실패: " + err.message);
@@ -209,79 +288,228 @@ const BookingPage = () => {
     }
   }, [movieDetails, selectedDate]);
 
+  // Load seat data and ticket prices when screening is selected
   useEffect(() => {
-    if (
-      selectedScreening?.screeningRoom?.roomId &&
-      selectedScreening?.screeningId
-    ) {
-      const fetchDetails = async () => {
+    if (selectedScreening?.screeningId) {
+      const fetchScreeningData = async () => {
         setIsLoading(true);
         setPageError(null);
+        console.log(
+          `Fetching screening data for screening ID: ${selectedScreening.screeningId}`
+        );
         try {
-          const roomData = await roomService.getPublicScreeningRoomById(
-            selectedScreening.screeningRoom.roomId
-          ); // Use public mock
+          // Fetch both seat data and ticket prices in parallel
+          const [seatData, ticketPriceData] = await Promise.all([
+            screeningService.getScreeningSeats(selectedScreening.screeningId),
+            screeningService.getScreeningTicketPrices(
+              selectedScreening.screeningId
+            ),
+          ]);
 
-          const mockBooked = []; // Simulate some booked seats for mock
-          if (roomData?.seatLayout) {
-            const allSeatIds = roomData.seatLayout.flatMap((rowDef) =>
-              Array.from(
-                { length: rowDef.numberOfSeats },
-                (_, i) => `${rowDef.rowIdentifier}${i + 1}`
-              )
-            );
-            const alreadyBookedCount = Math.floor(
-              allSeatIds.length *
-                (1 -
-                  selectedScreening.availableSeats /
-                    selectedScreening.totalSeats) *
-                0.7
-            ); // 70% of calculated booked
-            for (
-              let i = 0;
-              i < alreadyBookedCount && allSeatIds.length > 0;
-              i++
-            ) {
-              const randomIndex = Math.floor(Math.random() * allSeatIds.length);
-              mockBooked.push(allSeatIds.splice(randomIndex, 1)[0]);
-            }
-          }
-          setBookedSeatsForScreening(mockBooked);
-          if (roomData && roomData.seatLayout) {
-            setSeatMatrix(
-              generateSeatMatrixUtil(roomData.seatLayout, mockBooked)
-            );
-          } else {
-            setSeatMatrix([]);
-          }
+          console.log("Fetched seat data:", seatData);
+          console.log("Fetched ticket price data:", ticketPriceData);
 
-          const prices = await priceService.getPublicPriceSettingsByRoom(
-            selectedScreening.screeningRoom.roomId
-          ); // Use public mock
-          setPriceSettingsForRoom(prices || []);
+          setScreeningSeatsData(seatData);
+          setScreeningTicketPrices(ticketPriceData);
+          setSelectedSeats([]);
+
+          // Reset ticket counts based on new pricing
+          if (ticketPriceData?.ticketPrices) {
+            const initialCounts = {};
+            ticketPriceData.ticketPrices.forEach((ticketPrice) => {
+              initialCounts[ticketPrice.ticketTypeId] = 0;
+            });
+            console.log("Setting initial ticket counts:", initialCounts);
+            setTicketCounts(initialCounts);
+          }
         } catch (err) {
-          setPageError("좌석/가격 정보 로딩 실패: " + err.message);
+          console.error("Error fetching screening data:", err);
+          setPageError("상영 정보 로딩 실패: " + err.message);
         } finally {
           setIsLoading(false);
         }
       };
-      fetchDetails();
-      setSelectedSeats([]);
+      fetchScreeningData();
     }
   }, [selectedScreening]);
 
-  // Callbacks (handleDateSelect, handleScreeningSelect, handleTicketCountChange, handleSeatSelect) remain largely the same logic
-  const handleDateSelect = useCallback((date) => setSelectedDate(date), []);
-  const handleScreeningSelect = useCallback(
-    (screening) => setSelectedScreening(screening),
+  // 예매 취소 함수
+  const cancelCurrentReservation = useCallback(
+    async (reason = "사용자 취소") => {
+      if (!currentReservationRef.current) {
+        console.log("취소할 예매가 없습니다.");
+        return;
+      }
+
+      const { reservationId, status } = currentReservationRef.current;
+
+      // 이미 완료된 예매는 취소하지 않음
+      if (status === "COMPLETED") {
+        console.log("이미 완료된 예매는 취소하지 않습니다.");
+        return;
+      }
+
+      try {
+        console.log(
+          "🚫 예매 취소 시도 - Reservation ID:",
+          reservationId,
+          "Reason:",
+          reason
+        );
+
+        await reservationService.cancelReservation({
+          reservationId: reservationId,
+          refundReason: reason,
+        });
+
+        console.log("✅ 예매 취소 완료");
+        currentReservationRef.current = null;
+      } catch (error) {
+        console.warn("예매 취소 실패 (API가 구현되지 않았을 수 있음):", error);
+        // API가 구현되지 않았어도 로컬 상태는 정리
+        currentReservationRef.current = null;
+      }
+    },
     []
   );
+
+  const releaseSelectedSeats = useCallback(async () => {
+    if (!selectedScreening?.screeningId || heldSeatsRef.current.length === 0)
+      return;
+
+    try {
+      await reservationService.releaseSeats({
+        screeningId: selectedScreening.screeningId,
+        seatIds: heldSeatsRef.current,
+      });
+      heldSeatsRef.current = [];
+      if (seatHoldTimeoutRef.current) {
+        clearTimeout(seatHoldTimeoutRef.current);
+      }
+    } catch (error) {
+      console.error("Failed to release seats:", error);
+    }
+  }, [selectedScreening]);
+
+  // 좌석 해제 및 예매 취소 함수
+  const cleanupReservationAndSeats = useCallback(
+    async (reason = "페이지 이탈") => {
+      console.log("🧹 예매 및 좌석 정리 시작:", reason);
+
+      // 좌석 해제
+      await releaseSelectedSeats();
+
+      // 예매 취소
+      await cancelCurrentReservation(reason);
+
+      console.log("🧹 예매 및 좌석 정리 완료");
+    },
+    [releaseSelectedSeats, cancelCurrentReservation]
+  );
+
+  // Clean up seat holds when component unmounts or seats change
+  useEffect(() => {
+    return () => {
+      if (seatHoldTimeoutRef.current) {
+        clearTimeout(seatHoldTimeoutRef.current);
+      }
+      if (heldSeatsRef.current.length > 0 && selectedScreening?.screeningId) {
+        reservationService
+          .releaseSeats({
+            screeningId: selectedScreening.screeningId,
+            seatIds: heldSeatsRef.current,
+          })
+          .catch(console.error);
+      }
+    };
+  }, [selectedScreening]);
+
+  // 브라우저 이벤트 처리 (창 닫기, 새로고침, 페이지 이탈)
+  useEffect(() => {
+    const handleBeforeUnload = (event) => {
+      if (currentReservationRef.current?.status === "PENDING_PAYMENT") {
+        // 브라우저가 페이지를 닫기 전에 예매 취소 시도
+        navigator.sendBeacon(
+          "/api/protected/reservations/cancel",
+          JSON.stringify({
+            reservationId: currentReservationRef.current.reservationId,
+            refundReason: "브라우저 창 닫기",
+          })
+        );
+
+        event.preventDefault();
+        event.returnValue =
+          "결제 진행 중입니다. 페이지를 벗어나면 예매가 취소됩니다.";
+        return event.returnValue;
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (
+        document.visibilityState === "hidden" &&
+        currentReservationRef.current?.status === "PENDING_PAYMENT"
+      ) {
+        // 페이지가 숨겨질 때 (탭 변경, 앱 변경 등)
+        cleanupReservationAndSeats("페이지 숨김");
+      }
+    };
+
+    // 이벤트 리스너 등록
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    // 컴포넌트 언마운트 시 정리
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+
+      // 컴포넌트 언마운트 시에도 예매 취소
+      if (currentReservationRef.current?.status === "PENDING_PAYMENT") {
+        cleanupReservationAndSeats("컴포넌트 언마운트");
+      }
+    };
+  }, [cleanupReservationAndSeats]);
+
+  const handleDateSelect = useCallback((date) => setSelectedDate(date), []);
+
+  const handleScreeningSelect = useCallback(
+    (screening) => {
+      // Check if user is logged in when selecting screening
+      if (!user) {
+        // Show login selection UI instead of simple confirm
+        setPendingScreening(screening);
+        setShowLoginSelection(true);
+        return;
+      }
+      setSelectedScreening(screening);
+    },
+    [user]
+  );
+
+  const handleLoginSelection = (loginType) => {
+    setShowLoginSelection(false);
+
+    if (loginType === "member") {
+      navigate("/login", { state: { from: location } });
+    } else if (loginType === "guest") {
+      navigate("/guest/login", { state: { from: location } });
+    } else {
+      // 취소한 경우
+      setPendingScreening(null);
+    }
+  };
+
+  const cancelLoginSelection = () => {
+    setShowLoginSelection(false);
+    setPendingScreening(null);
+  };
+
   const handleTicketCountChange = useCallback(
-    (typeIdentifier, delta) => {
+    (ticketTypeId, delta) => {
       setTicketCounts((prev) => {
-        const currentCount = prev[typeIdentifier] || 0;
+        const currentCount = prev[ticketTypeId] || 0;
         const newCount = Math.max(0, currentCount + delta);
-        const updatedCounts = { ...prev, [typeIdentifier]: newCount };
+        const updatedCounts = { ...prev, [ticketTypeId]: newCount };
         const totalTickets = Object.values(updatedCounts).reduce(
           (sum, count) => sum + count,
           0
@@ -301,49 +529,191 @@ const BookingPage = () => {
     [selectedSeats.length]
   );
 
+  const holdNewSeats = useCallback(
+    async (newSeatIds) => {
+      if (!selectedScreening?.screeningId || newSeatIds.length === 0) return;
+
+      // Filter out seats that are already held
+      const seatsToHold = newSeatIds.filter(
+        (id) => !heldSeatsRef.current.includes(id)
+      );
+
+      if (seatsToHold.length === 0) {
+        console.log("No new seats to hold");
+        return;
+      }
+
+      try {
+        console.log("Holding new seats:", seatsToHold);
+        await reservationService.holdSeats({
+          screeningId: selectedScreening.screeningId,
+          seatIds: seatsToHold,
+        });
+
+        // Add new held seats to the current list
+        heldSeatsRef.current = [...heldSeatsRef.current, ...seatsToHold];
+        console.log("Currently held seats:", heldSeatsRef.current);
+
+        // Reset timeout for all held seats
+        if (seatHoldTimeoutRef.current) {
+          clearTimeout(seatHoldTimeoutRef.current);
+        }
+        seatHoldTimeoutRef.current = setTimeout(async () => {
+          try {
+            await reservationService.releaseSeats({
+              screeningId: selectedScreening.screeningId,
+              seatIds: heldSeatsRef.current,
+            });
+            heldSeatsRef.current = [];
+            alert("좌석 선점 시간이 만료되었습니다. 다시 선택해주세요.");
+            setSelectedSeats([]);
+          } catch (error) {
+            console.error("Failed to release seats:", error);
+          }
+        }, 10 * 60 * 1000); // 10 minutes
+      } catch (error) {
+        console.error("Failed to hold new seats:", error);
+
+        // Handle specific 409 error
+        if (error.message?.includes("이미 선택된 좌석")) {
+          console.warn("Some seats are already held, trying to continue...");
+          // Don't show alert for this case, just log the warning
+        } else {
+          alert("좌석 선점에 실패했습니다. 다시 시도해주세요.");
+        }
+      }
+    },
+    [selectedScreening]
+  );
+
+  const releaseSpecificSeats = useCallback(
+    async (seatIds) => {
+      if (!selectedScreening?.screeningId || seatIds.length === 0) return;
+
+      try {
+        console.log("Releasing specific seats:", seatIds);
+        await reservationService.releaseSeats({
+          screeningId: selectedScreening.screeningId,
+          seatIds: seatIds,
+        });
+
+        // Remove released seats from held seats list
+        heldSeatsRef.current = heldSeatsRef.current.filter(
+          (id) => !seatIds.includes(id)
+        );
+        console.log("Remaining held seats:", heldSeatsRef.current);
+      } catch (error) {
+        console.error("Failed to release specific seats:", error);
+      }
+    },
+    [selectedScreening]
+  );
+
   const handleSeatSelect = useCallback(
     (seatId) => {
       const totalTickets = Object.values(ticketCounts).reduce(
         (sum, count) => sum + count,
         0
       );
+
+      console.log(
+        `Seat selection: seatId=${seatId}, totalTickets=${totalTickets}, currentSelectedSeats=`,
+        selectedSeats
+      );
+
       if (totalTickets === 0) {
         alert("먼저 관람 인원을 선택해주세요.");
         return;
       }
-      setSelectedSeats((prev) =>
-        prev.includes(seatId)
-          ? prev.filter((s) => s !== seatId)
-          : prev.length < totalTickets
-          ? [...prev, seatId]
-          : (alert(`선택한 인원(${totalTickets}명)만큼 좌석을 선택하셨습니다.`),
-            prev)
-      );
+
+      setSelectedSeats((prev) => {
+        const isAlreadySelected = prev.includes(seatId);
+        let newSeats;
+
+        if (isAlreadySelected) {
+          // Deselecting a seat
+          newSeats = prev.filter((s) => s !== seatId);
+          console.log("Deselecting seat:", seatId);
+        } else {
+          // Selecting a new seat
+          if (prev.length >= totalTickets) {
+            alert(`선택한 인원(${totalTickets}명)만큼 좌석을 선택하셨습니다.`);
+            return prev; // No change
+          }
+          newSeats = [...prev, seatId];
+          console.log("Selecting seat:", seatId);
+        }
+
+        console.log("Updated selected seats:", newSeats);
+
+        // Hold or release seats based on selection
+        if (newSeats.length > prev.length) {
+          // Seat added, hold only the new seat
+          const newSeatNumber = newSeats[newSeats.length - 1]; // Last added seat
+          const newSeatId =
+            typeof newSeatNumber === "string"
+              ? screeningSeatsData?.seats?.find(
+                  (s) => s.seatNumber === newSeatNumber
+                )?.seatId || newSeatNumber
+              : newSeatNumber;
+
+          console.log("Holding new seat:", newSeatId);
+          holdNewSeats([newSeatId]);
+        } else if (newSeats.length < prev.length) {
+          // Seat removed, release only the removed seat
+          const removedSeat = prev.find((seat) => !newSeats.includes(seat));
+          if (removedSeat) {
+            const removedSeatId =
+              typeof removedSeat === "string"
+                ? screeningSeatsData?.seats?.find(
+                    (s) => s.seatNumber === removedSeat
+                  )?.seatId || removedSeat
+                : removedSeat;
+
+            console.log("Releasing removed seat:", removedSeatId);
+            releaseSpecificSeats([removedSeatId]);
+          }
+        }
+
+        return newSeats;
+      });
     },
-    [ticketCounts]
+    [
+      ticketCounts,
+      selectedSeats,
+      screeningSeatsData,
+      holdNewSeats,
+      releaseSpecificSeats,
+    ]
   );
 
   const totalSelectedTickets = Object.values(ticketCounts).reduce(
     (sum, count) => sum + count,
     0
   );
+
   const totalPrice = Object.entries(ticketCounts).reduce(
-    (sum, [typeIdentifier, count]) => {
-      const ticketTypeInfo = publicTicketTypes?.find(
-        (tt) =>
-          tt.typeName.toUpperCase().replace(" (MOCK)", "") === typeIdentifier
-      );
-      if (ticketTypeInfo) {
-        const priceSetting = priceSettingsForRoom.find(
-          (ps) => ps.ticketTypeId === ticketTypeInfo.ticketTypeId
+    (sum, [ticketTypeId, count]) => {
+      if (count > 0) {
+        // Use actual screening ticket price if available
+        const ticketPrice = screeningTicketPrices?.ticketPrices?.find(
+          (tp) => tp.ticketTypeId.toString() === ticketTypeId.toString()
         );
-        // Use TICKET_PRICES_FALLBACK if specific price setting not found for the mock ticket type
-        const price = priceSetting
-          ? priceSetting.price
-          : TICKET_PRICES_FALLBACK[
-              ticketTypeInfo.typeName.toLowerCase().replace(" (mock)", "")
-            ] || 0;
-        return sum + count * price;
+
+        if (ticketPrice) {
+          return sum + count * ticketPrice.price;
+        }
+
+        // Fallback to global ticket type with fallback pricing
+        const globalTicketType = globalTicketTypes?.find(
+          (tt) => tt.ticketTypeId.toString() === ticketTypeId.toString()
+        );
+        if (globalTicketType) {
+          const price =
+            TICKET_PRICES_FALLBACK[globalTicketType.typeName?.toLowerCase()] ||
+            TICKET_PRICES_FALLBACK.adult;
+          return sum + count * price;
+        }
       }
       return sum;
     },
@@ -351,7 +721,6 @@ const BookingPage = () => {
   );
 
   const proceedToNextStep = () => {
-    /* Same as before */
     if (currentStep === 1 && selectedScreening) setCurrentStep(2);
     else if (
       currentStep === 2 &&
@@ -371,27 +740,393 @@ const BookingPage = () => {
         alert("선택한 인원 수만큼 좌석을 선택해주세요.");
     }
   };
-  const goBackStep = () => currentStep > 1 && setCurrentStep(currentStep - 1);
+
+  const goBackStep = async () => {
+    if (currentStep > 1) {
+      if (currentStep === 3) {
+        // Going back from payment to seat selection - 예매 취소
+        await cancelCurrentReservation("사용자가 결제 단계에서 뒤로가기");
+        setCurrentStep(currentStep - 1);
+      } else if (currentStep === 2) {
+        // Going back from seat selection to time selection
+        releaseSelectedSeats();
+        setSelectedSeats([]);
+        setCurrentStep(currentStep - 1);
+      }
+    }
+  };
+
+  const handlePaymentReady = useCallback((paymentInfo) => {
+    setPaymentData(paymentInfo);
+  }, []);
 
   const handleFinalBooking = async () => {
-    /* Same as before */
+    console.log("handleFinalBooking called with:", {
+      user: !!user,
+      paymentData,
+    });
+
     if (!user) {
       alert("로그인이 필요합니다.");
       navigate("/login", { state: { from: location } });
       return;
     }
-    alert(
-      `최종 결제 금액: ${totalPrice.toLocaleString()}원\n${
-        movieDetails.title
-      } / ${selectedDate} ${
-        selectedScreening
-          ? formatTime(selectedScreening.screeningTime.substring(11, 16))
-          : ""
-      } / ${
-        selectedScreening?.screeningRoom.roomName
-      }\n좌석: ${selectedSeats.join(", ")}\n(실제 결제 로직 필요)`
-    );
-    // navigate('/profile'); // Or to a booking confirmation page
+
+    if (!paymentData) {
+      alert("결제 정보를 설정해주세요.");
+      return;
+    }
+
+    if (paymentData.finalAmount <= 0) {
+      // Free booking (no payment required)
+      await handleFreeBooking();
+      return;
+    }
+
+    if (paymentData.finalAmount < 100) {
+      alert("결제 최소 금액은 100원입니다.");
+      return;
+    }
+
+    // Start payment process
+    await handleTossPayment();
+  };
+
+  const handleFreeBooking = async () => {
+    try {
+      setIsProcessingPayment(true);
+
+      // Prepare seat IDs
+      const seatIds = selectedSeats.map((seatIdentifier) => {
+        const seatId =
+          typeof seatIdentifier === "string"
+            ? screeningSeatsData?.seats?.find(
+                (s) => s.seatNumber === seatIdentifier
+              )?.seatId || seatIdentifier
+            : seatIdentifier;
+        return parseInt(seatId);
+      });
+
+      // Prepare ticket types with counts
+      const ticketTypes = Object.entries(ticketCounts)
+        .filter(([_, count]) => count > 0)
+        .map(([ticketTypeId, count]) => ({
+          ticketTypeId: parseInt(ticketTypeId),
+          count: count,
+        }));
+
+      const reservationData = {
+        screeningId: selectedScreening.screeningId,
+        ticketTypes: ticketTypes,
+        seatIds: seatIds,
+      };
+
+      console.log("Creating free reservation with data:", reservationData);
+
+      const reservation = await reservationService.createReservation(
+        reservationData
+      );
+
+      console.log(
+        "🆓 무료 예매 - Reservation ID:",
+        reservation?.reservationId || reservation?.id
+      );
+
+      // 무료 예매 정보 저장
+      const reservationId = reservation?.reservationId || reservation?.id;
+      currentReservationRef.current = {
+        reservationId: reservationId,
+        status: "COMPLETED", // 무료 예매는 바로 완료
+      };
+
+      alert(
+        `예매가 완료되었습니다! (무료 예매)\n` +
+          `예매 ID: ${reservation.reservationId}\n` +
+          `${movieDetails.title} / ${formatDate(selectedDate)} ${
+            selectedScreening?.screeningStartTime
+              ? formatTime(selectedScreening.screeningStartTime)
+              : selectedScreening?.screeningTime
+              ? selectedScreening.screeningTime.includes("T")
+                ? formatTime(selectedScreening.screeningTime.substring(11, 16))
+                : formatTime(selectedScreening.screeningTime)
+              : ""
+          } / ${
+            selectedScreening?.roomName ||
+            selectedScreening?.screeningRoom?.roomName
+          }\n` +
+          `좌석: ${selectedSeats.join(", ")}`
+      );
+
+      navigate("/profile");
+    } catch (error) {
+      console.error("Free booking failed:", error);
+      alert("예매에 실패했습니다: " + error.message);
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
+  const handleTossPayment = async () => {
+    try {
+      setIsProcessingPayment(true);
+
+      console.log("Starting Toss payment process...");
+      console.log("Current state:", {
+        user,
+        paymentData,
+        selectedSeats,
+        screeningSeatsData: !!screeningSeatsData,
+        selectedScreening: !!selectedScreening,
+        movieDetails: !!movieDetails,
+      });
+
+      // Validate all required data before starting
+      if (!user) {
+        throw new Error("사용자 정보를 찾을 수 없습니다.");
+      }
+      if (!paymentData) {
+        throw new Error("결제 정보를 찾을 수 없습니다.");
+      }
+      if (!selectedSeats?.length) {
+        throw new Error("선택된 좌석이 없습니다.");
+      }
+      if (!selectedScreening) {
+        throw new Error("선택된 상영 정보가 없습니다.");
+      }
+
+      // First, create reservation
+      const seatIds = selectedSeats.map((seatIdentifier) => {
+        const seatId =
+          typeof seatIdentifier === "string"
+            ? screeningSeatsData?.seats?.find(
+                (s) => s.seatNumber === seatIdentifier
+              )?.seatId || seatIdentifier
+            : seatIdentifier;
+        const numericSeatId = parseInt(seatId);
+        if (isNaN(numericSeatId)) {
+          throw new Error(`유효하지 않은 좌석 ID: ${seatId}`);
+        }
+        return numericSeatId;
+      });
+
+      const ticketTypes = Object.entries(ticketCounts)
+        .filter(([_, count]) => count > 0)
+        .map(([ticketTypeId, count]) => ({
+          ticketTypeId: parseInt(ticketTypeId),
+          count: count,
+        }));
+
+      const reservationData = {
+        screeningId: selectedScreening.screeningId,
+        ticketTypes: ticketTypes,
+        seatIds: seatIds,
+      };
+
+      console.log("Creating reservation for payment:", reservationData);
+      const reservation = await reservationService.createReservation(
+        reservationData
+      );
+
+      console.log("Reservation created:", reservation);
+
+      // Improved validation with better error handling
+      if (!reservation) {
+        throw new Error("예약 생성에 실패했습니다. 서버 응답이 없습니다.");
+      }
+
+      const reservationId = reservation.reservationId || reservation.id;
+      if (!reservationId) {
+        console.error("Reservation object:", reservation);
+        throw new Error("예약 생성에 실패했습니다. 예약 ID를 받지 못했습니다.");
+      }
+
+      // 결제 과정에서 reservationId 출력
+      console.log("🎫 결제 진행 중 - Reservation ID:", reservationId);
+
+      // Generate payment identifiers
+      const orderId = paymentService.generateOrderId();
+
+      // 현재 예매 정보 저장 (취소를 위해)
+      currentReservationRef.current = {
+        reservationId: reservationId,
+        orderId: orderId,
+        status: "PENDING_PAYMENT",
+      };
+      const userId = getUserId(user);
+      console.log("Generated userId for payment:", userId);
+      const customerKey = paymentService.generateCustomerKey(userId);
+
+      // Save payment info before payment
+      const paymentBeforeData = {
+        reservationId: reservationId,
+        orderId: orderId,
+        paymentMethod: paymentData.paymentMethod || "CARD",
+        currency: "KRW",
+        paymentDiscountId: paymentData.selectedDiscount?.id || null,
+        usedPointAmount: paymentData.usePoints || 0,
+        amount: paymentData.originalAmount || 0,
+        finalAmount: paymentData.finalAmount || 0,
+      };
+
+      console.log(
+        "💰 결제 정보 저장 - Reservation ID:",
+        reservationId,
+        "Final Amount:",
+        paymentData.finalAmount
+      );
+
+      // Validate payment data before sending
+      if (paymentBeforeData.finalAmount <= 0) {
+        throw new Error("유효하지 않은 결제 금액입니다.");
+      }
+
+      console.log("Saving payment before data:", paymentBeforeData);
+      const paymentBeforeResult = await paymentService.savePaymentBefore(
+        paymentBeforeData
+      );
+
+      console.log("Payment before result:", paymentBeforeResult);
+
+      // Improved payment ID validation
+      const paymentId = getPaymentId(paymentBeforeResult);
+      if (!paymentId) {
+        console.error("Payment before result:", paymentBeforeResult);
+        throw new Error(
+          "결제 정보 저장에 실패했습니다. 결제 ID를 받지 못했습니다."
+        );
+      }
+
+      localStorage.setItem(`payment_${orderId}`, paymentId.toString());
+
+      // Save payment data for later use in success page
+      localStorage.setItem(
+        `payment_data_${orderId}`,
+        JSON.stringify({
+          reservationId: reservationId,
+          paymentId: paymentId,
+          orderId: orderId,
+          amount: paymentData.finalAmount,
+        })
+      );
+
+      // Check if TossPayments is available from global script
+      if (typeof window.TossPayments === "undefined") {
+        throw new Error(
+          "Toss Payments 스크립트가 로드되지 않았습니다. 페이지를 새로고침해주세요."
+        );
+      }
+
+      // Initialize Toss Payments v2 SDK with client key
+      const tossPayments = window.TossPayments(TOSS_PAYMENTS_CONFIG.CLIENT_KEY);
+
+      // Create payment instance with customerKey
+      const payment = tossPayments.payment({ customerKey });
+
+      const orderName = `${movieDetails?.title || "영화"} 예매`;
+
+      // Validate required data before payment request
+      if (!paymentData || !paymentData.finalAmount || !orderId) {
+        throw new Error("결제에 필요한 정보가 부족합니다.");
+      }
+
+      // Map payment method to Toss Payments v2 format
+      let paymentMethod;
+      let paymentAmount = paymentData.finalAmount;
+      let currency = "KRW";
+
+      switch (paymentData.paymentMethod) {
+        case "CARD":
+          paymentMethod = "CARD";
+          break;
+        case "TRANSFER":
+          paymentMethod = "TRANSFER";
+          break;
+        case "VIRTUAL_ACCOUNT":
+          paymentMethod = "VIRTUAL_ACCOUNT";
+          break;
+        case "MOBILE_PHONE":
+          paymentMethod = "MOBILE_PHONE";
+          break;
+        case "CULTURE_GIFT_CERTIFICATE":
+          paymentMethod = "CULTURE_GIFT_CERTIFICATE";
+          break;
+        case "FOREIGN_EASY_PAY":
+          paymentMethod = "FOREIGN_EASY_PAY";
+          // PayPal의 경우 USD로 변환 (임시로 1000원 = 1달러로 계산)
+          paymentAmount = Math.ceil(paymentData.finalAmount / 1000);
+          currency = "USD";
+          break;
+        default:
+          paymentMethod = "CARD";
+      }
+
+      // Prepare payment request data for v2 SDK
+      const paymentRequestData = {
+        method: paymentMethod,
+        amount: {
+          currency: currency,
+          value: paymentAmount,
+        },
+        orderId: orderId,
+        orderName: orderName,
+        successUrl: TOSS_PAYMENTS_CONFIG.SUCCESS_URL,
+        failUrl: TOSS_PAYMENTS_CONFIG.FAIL_URL,
+        customerEmail: user?.email || `customer${userId}@example.com`,
+        customerName: user?.name || user?.nickname || `고객${userId}`,
+        customerMobilePhone: user?.phone || user?.mobile || "01000000000",
+      };
+
+      // Add method-specific options
+      if (paymentMethod === "CARD") {
+        paymentRequestData.card = {
+          useEscrow: false,
+          flowMode: "DEFAULT", // 통합결제창 여는 옵션
+          useCardPoint: false,
+          useAppCardOnly: false,
+        };
+      }
+
+      console.log("Requesting payment with method:", paymentMethod);
+      console.log("Payment request data:", paymentRequestData);
+
+      // Request payment using v2 SDK
+      await payment.requestPayment(paymentRequestData);
+    } catch (error) {
+      console.error("Payment process failed:", error);
+
+      // 결제 실패 시 예매 취소
+      await cancelCurrentReservation("결제 실패");
+
+      // Handle specific Toss Payment errors
+      if (error.code && error.message) {
+        // Toss Payments specific error
+        navigate(
+          `/payment/fail?code=${error.code}&message=${encodeURIComponent(
+            error.message
+          )}`
+        );
+      } else {
+        // Generic error
+        alert(
+          "결제 처리 중 오류가 발생했습니다: " +
+            (error.message || "알 수 없는 오류")
+        );
+      }
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
+  // Helper function to safely get user ID
+  const getUserId = (user) => {
+    if (!user) return 1;
+    return user.id || user.userId || user.customerId || user.loginId || 1;
+  };
+
+  // Helper function to safely get payment ID
+  const getPaymentId = (paymentResult) => {
+    if (!paymentResult) return null;
+    return paymentResult.paymentId || paymentResult.id;
   };
 
   if (!movieDetails && isLoading)
@@ -412,7 +1147,6 @@ const BookingPage = () => {
     );
 
   const renderStepContent = () => {
-    /* ... (switch case for steps as before, but use pageError) ... */
     switch (currentStep) {
       case 1:
         return (
@@ -434,15 +1168,36 @@ const BookingPage = () => {
                 onScreeningSelect={handleScreeningSelect}
               />
             )}
-            {selectedScreening && (
-              <Button
-                onClick={proceedToNextStep}
-                fullWidth
-                disabled={isLoading || !publicTicketTypes?.length}
-              >
-                다음 (인원/좌석 선택)
-              </Button>
-            )}
+            {selectedScreening &&
+              (() => {
+                const hasScreeningTickets =
+                  !!screeningTicketPrices?.ticketPrices?.length;
+                const hasGlobalTickets = !!globalTicketTypes?.length;
+                const hasAnyTicketData =
+                  hasScreeningTickets || hasGlobalTickets;
+                const buttonDisabled = isLoading || !hasAnyTicketData;
+
+                console.log("Step 1 Button state:", {
+                  selectedScreening: !!selectedScreening,
+                  isLoading,
+                  hasScreeningTickets,
+                  hasGlobalTickets,
+                  hasAnyTicketData,
+                  buttonDisabled,
+                  screeningTicketPrices: screeningTicketPrices?.ticketPrices,
+                  globalTicketTypes,
+                });
+
+                return (
+                  <Button
+                    onClick={proceedToNextStep}
+                    fullWidth
+                    disabled={buttonDisabled}
+                  >
+                    다음 (인원/좌석 선택)
+                  </Button>
+                );
+              })()}
           </>
         );
       case 2:
@@ -456,24 +1211,37 @@ const BookingPage = () => {
             </StepHeader>
             <InfoText>
               {movieDetails.title} / {formatDate(selectedDate)} /{" "}
-              {selectedScreening
-                ? formatTime(selectedScreening.screeningTime.substring(11, 16))
+              {selectedScreening?.screeningStartTime
+                ? formatTime(selectedScreening.screeningStartTime)
+                : selectedScreening?.screeningTime
+                ? selectedScreening.screeningTime.includes("T")
+                  ? formatTime(
+                      selectedScreening.screeningTime.substring(11, 16)
+                    )
+                  : formatTime(selectedScreening.screeningTime)
                 : ""}{" "}
-              ({selectedScreening?.screeningRoom.roomName})
+              (
+              {selectedScreening?.roomName ||
+                selectedScreening?.screeningRoom?.roomName}
+              )
             </InfoText>
-            {!publicTicketTypes?.length && (
+            {!(
+              screeningTicketPrices?.ticketPrices?.length ||
+              globalTicketTypes?.length
+            ) && (
               <LoadingErrorDisplay>티켓 정보 로딩 중...</LoadingErrorDisplay>
             )}
-            {publicTicketTypes?.length > 0 && (
+            {(screeningTicketPrices?.ticketPrices || globalTicketTypes)
+              ?.length > 0 && (
               <TicketCounter
                 ticketCounts={ticketCounts}
                 onTicketCountChange={handleTicketCountChange}
-                priceSettings={priceSettingsForRoom} // These are now public mock price settings
+                ticketTypes={
+                  screeningTicketPrices?.ticketPrices || globalTicketTypes
+                }
                 maxTotalTickets={MAX_SEATS_PER_BOOKING}
                 selectedSeatsCount={selectedSeats.length}
-                // Pass publicTicketTypes to TicketCounter if it needs to map them by ID/name
-                // For simplicity, TicketCounter now relies on keys of ticketCounts object matching typeName.toUpperCase().
-                // You might want to pass `publicTicketTypes` to `TicketCounter` for more robust mapping.
+                useActualPrices={!!screeningTicketPrices?.ticketPrices}
               />
             )}
             {isLoading && selectedScreening && (
@@ -483,10 +1251,10 @@ const BookingPage = () => {
               <LoadingErrorDisplay $isError>{pageError}</LoadingErrorDisplay>
             )}
             {!isLoading &&
-              seatMatrix.length > 0 &&
+              screeningSeatsData?.seats &&
               totalSelectedTickets > 0 && (
                 <SeatLayout
-                  seatMatrix={seatMatrix}
+                  seats={screeningSeatsData.seats}
                   selectedSeats={selectedSeats}
                   onSeatSelect={handleSeatSelect}
                   totalTicketsSelected={totalSelectedTickets}
@@ -498,11 +1266,15 @@ const BookingPage = () => {
             )}
             {totalSelectedTickets > 0 &&
               selectedSeats.length === totalSelectedTickets &&
-              seatMatrix.length > 0 && (
+              screeningSeatsData?.seats && (
                 <Button
                   onClick={proceedToNextStep}
                   fullWidth
-                  disabled={isLoading || !publicTicketTypes?.length}
+                  disabled={
+                    isLoading ||
+                    !(screeningTicketPrices?.ticketPrices || globalTicketTypes)
+                      ?.length
+                  }
                 >
                   다음 (최종 확인)
                 </Button>
@@ -525,33 +1297,32 @@ const BookingPage = () => {
               </p>
               <p>
                 <strong>상영관:</strong>{" "}
-                {selectedScreening?.screeningRoom.roomName}
+                {selectedScreening?.roomName ||
+                  selectedScreening?.screeningRoom?.roomName}
               </p>
               <p>
                 <strong>날짜:</strong> {formatDate(selectedDate)}
               </p>
               <p>
                 <strong>시간:</strong>{" "}
-                {selectedScreening
-                  ? formatTime(
-                      selectedScreening.screeningTime.substring(11, 16)
-                    )
+                {selectedScreening?.screeningStartTime
+                  ? formatTime(selectedScreening.screeningStartTime)
+                  : selectedScreening?.screeningTime
+                  ? selectedScreening.screeningTime.includes("T")
+                    ? formatTime(
+                        selectedScreening.screeningTime.substring(11, 16)
+                      )
+                    : formatTime(selectedScreening.screeningTime)
                   : ""}
               </p>
               <p>
                 <strong>인원:</strong>
-                {publicTicketTypes
-                  ?.map((tt) =>
-                    ticketCounts[
-                      tt.typeName.toUpperCase().replace(" (MOCK)", "")
-                    ] > 0
-                      ? ` ${tt.typeName} ${
-                          ticketCounts[
-                            tt.typeName.toUpperCase().replace(" (MOCK)", "")
-                          ]
-                        }명`
-                      : ""
-                  )
+                {(screeningTicketPrices?.ticketPrices || globalTicketTypes)
+                  ?.map((tt) => {
+                    const ticketTypeId = tt.ticketTypeId;
+                    const count = ticketCounts[ticketTypeId];
+                    return count > 0 ? ` ${tt.typeName} ${count}명` : "";
+                  })
                   .join(", ")
                   .trim() || "선택 안함"}
               </p>
@@ -563,18 +1334,24 @@ const BookingPage = () => {
                 <span>{totalPrice.toLocaleString()}원</span>
               </TotalPriceDisplay>
             </SummarySection>
-            <SummarySection style={{ marginTop: "1rem" }}>
-              <h4>결제 수단</h4>
-              <InfoText>실제 결제 모듈(PG 연동)이 여기에 연결됩니다.</InfoText>
-            </SummarySection>
+            <PaymentSection
+              originalAmount={totalPrice}
+              onPaymentReady={handlePaymentReady}
+              isProcessing={isProcessingPayment}
+            />
             <Button
               onClick={handleFinalBooking}
               variant="primary"
               size="lg"
               fullWidth
               style={{ marginTop: "2rem" }}
+              disabled={isProcessingPayment || !paymentData}
             >
-              {totalPrice.toLocaleString()}원 결제하기
+              {isProcessingPayment
+                ? "처리 중..."
+                : paymentData?.finalAmount > 0
+                ? `${paymentData.finalAmount.toLocaleString()}원 결제하기`
+                : "무료 예매하기"}
             </Button>
           </>
         );
@@ -590,6 +1367,44 @@ const BookingPage = () => {
         {movieDetails?.title || "영화 선택 중..."}
       </MovieTitleSmall>
       <StepContainer>{renderStepContent()}</StepContainer>
+
+      {/* Login Selection Modal */}
+      {showLoginSelection && (
+        <LoginSelectionOverlay onClick={cancelLoginSelection}>
+          <LoginSelectionModal onClick={(e) => e.stopPropagation()}>
+            <LoginSelectionTitle>
+              🎬 예매를 진행하시려면 로그인이 필요합니다
+            </LoginSelectionTitle>
+            <LoginSelectionText>
+              예매 방법을 선택해주세요. 회원 로그인 시 포인트 적립과 예매 내역
+              관리가 가능합니다.
+            </LoginSelectionText>
+            <LoginButtonsContainer>
+              <LoginOptionButton
+                className="member"
+                onClick={() => handleLoginSelection("member")}
+                fullWidth
+              >
+                👤 회원 로그인
+                <br />
+                <small>포인트 적립 • 예매 내역 관리</small>
+              </LoginOptionButton>
+              <LoginOptionButton
+                className="guest"
+                onClick={() => handleLoginSelection("guest")}
+                fullWidth
+              >
+                🚀 비회원 로그인
+                <br />
+                <small>간편 빠른 예매</small>
+              </LoginOptionButton>
+            </LoginButtonsContainer>
+            <CancelButton onClick={cancelLoginSelection} fullWidth>
+              취소
+            </CancelButton>
+          </LoginSelectionModal>
+        </LoginSelectionOverlay>
+      )}
     </BookingPageWrapper>
   );
 };

@@ -1,7 +1,12 @@
 // src/services/actorService.js
 import apiClient from "./apiClient";
 // API_ENDPOINTS 대신 API_ENDPOINTS_ADMIN를 임포트합니다.
-import { API_ENDPOINTS_ADMIN, ensureArray } from "../constants/config";
+import {
+  API_ENDPOINTS_ADMIN,
+  API_ENDPOINTS_CUSTOMER,
+  ensureArray,
+} from "../constants/config";
+import { mockPublicActorsData } from "../constants/mockData";
 
 /**
  * Fetches all actors.
@@ -93,4 +98,31 @@ export const setActorProfileImage = async (actorId, imageFile) => {
  */
 export const deleteActor = async (actorId, force = false) => {
   return apiClient.delete(API_ENDPOINTS_ADMIN.ACTOR_DELETE(actorId, force));
+};
+
+// ===== Public API Functions =====
+/**
+ * Fetches a single actor by ID for public use.
+ * @param {number|string} actorId
+ * @returns {Promise<ActorResponseDto>}
+ */
+export const getPublicActorById = async (actorId) => {
+  try {
+    return await apiClient.get(API_ENDPOINTS_CUSTOMER.ACTOR_GET_BY_ID(actorId));
+  } catch (error) {
+    console.warn(
+      `API call failed for actor ${actorId}, using mock data:`,
+      error
+    );
+    // API 호출 실패 시 목업 데이터로 fallback
+    const mockActor = mockPublicActorsData.find(
+      (actor) => actor.actorId.toString() === actorId.toString()
+    );
+
+    if (mockActor) {
+      return mockActor;
+    } else {
+      throw new Error(`배우 ID ${actorId}를 찾을 수 없습니다.`);
+    }
+  }
 };

@@ -21,26 +21,70 @@ export const DataProvider = ({ children }) => {
     const fetchAllData = async () => {
       setIsLoading(true);
       setError(null);
-      try {
-        const [genresData, ratingsData, ticketTypesData, distributorsData] =
-          await Promise.all([
-            genreService.getAllGenres(),
-            ratingService.getAllRatings(),
-            ticketTypeService.getAllTicketTypes(),
-            distributorService.getAllDistributors(),
-            // actorService.getAllActors(), // Consider if needed globally
-          ]);
-        setGenres(genresData || []);
-        setRatings(ratingsData || []);
-        setTicketTypes(ticketTypesData || []);
-        setDistributors(distributorsData || []);
-        // setActors(actorsData || []);
-      } catch (err) {
-        console.error("DataContext: Failed to fetch common data", err);
-        setError(err.message || "Could not load essential data.");
-      } finally {
-        setIsLoading(false);
+
+      // 각 데이터를 개별적으로 fetch하여 일부 실패해도 다른 데이터는 로드되도록 함
+      const results = await Promise.allSettled([
+        genreService.getAllGenres(),
+        ratingService.getAllRatings(),
+        ticketTypeService.getAllTicketTypes(),
+        distributorService.getAllDistributors(),
+      ]);
+
+      // 성공한 결과만 설정
+      const [
+        genresResult,
+        ratingsResult,
+        ticketTypesResult,
+        distributorsResult,
+      ] = results;
+
+      if (genresResult.status === "fulfilled") {
+        setGenres(genresResult.value || []);
+      } else {
+        console.warn(
+          "DataContext: Failed to fetch genres",
+          genresResult.reason
+        );
       }
+
+      if (ratingsResult.status === "fulfilled") {
+        setRatings(ratingsResult.value || []);
+      } else {
+        console.warn(
+          "DataContext: Failed to fetch ratings",
+          ratingsResult.reason
+        );
+      }
+
+      if (ticketTypesResult.status === "fulfilled") {
+        setTicketTypes(ticketTypesResult.value || []);
+      } else {
+        console.warn(
+          "DataContext: Failed to fetch ticket types",
+          ticketTypesResult.reason
+        );
+      }
+
+      if (distributorsResult.status === "fulfilled") {
+        setDistributors(distributorsResult.value || []);
+      } else {
+        console.warn(
+          "DataContext: Failed to fetch distributors",
+          distributorsResult.reason
+        );
+      }
+
+      // 모든 요청이 실패한 경우에만 에러 설정
+      const failedRequests = results.filter(
+        (result) => result.status === "rejected"
+      );
+      if (failedRequests.length === results.length) {
+        setError(
+          "일부 데이터를 불러오는데 실패했습니다. 관리자 권한이 필요할 수 있습니다."
+        );
+      }
+
+      setIsLoading(false);
     };
 
     fetchAllData();

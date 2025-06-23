@@ -173,15 +173,7 @@ const LoginPage = () => {
             />
             <label htmlFor="remember-me">아이디 저장</label>
           </CheckboxWrapper>
-          <StyledLink
-            to="/forgot-password"
-            onClick={(e) => {
-              e.preventDefault();
-              alert("비밀번호 찾기 기능은 준비 중입니다.");
-            }}
-          >
-            비밀번호를 잊으셨나요?
-          </StyledLink>
+          <StyledLink to="/forgot-password">비밀번호를 잊으셨나요?</StyledLink>
         </OptionsRow>
         <Button
           type="submit"
@@ -195,6 +187,10 @@ const LoginPage = () => {
       <ExtraLinks>
         계정이 없으신가요?
         <StyledLink to="/signup">회원가입</StyledLink>
+        <br />
+        <StyledLink to="/find-login-id">아이디 찾기</StyledLink>
+        <br />
+        <StyledLink to="/guest/login">비회원 로그인</StyledLink>
       </ExtraLinks>
     </LoginPageWrapper>
   );
