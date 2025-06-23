@@ -29,7 +29,17 @@ const ScreenIndicator = styled.div`
   box-shadow: 0px -2px 5px rgba(0, 0, 0, 0.1) inset;
 `;
 
-const SeatGrid = styled.div`
+const SeatGrid = styled.div.withConfig({
+  shouldForwardProp: (prop, defaultValidatorFn) => {
+    // 커스텀 props는 DOM에 전달하지 않음
+    if (prop === "cols") {
+      return false;
+    }
+    return typeof defaultValidatorFn === "function"
+      ? defaultValidatorFn(prop)
+      : true;
+  },
+})`
   display: grid;
   justify-content: center; /* Centers the grid if it's narrower than container */
   gap: ${({ theme }) => theme.spacing[1.5]}; /* Gap between seats */
@@ -69,16 +79,23 @@ const LegendItem = styled.div`
   gap: ${({ theme }) => theme.spacing[1.5]};
 `;
 
-const LegendColorBox = styled.span`
+const LegendColorBox = styled.span.withConfig({
+  shouldForwardProp: (prop, defaultValidatorFn) => {
+    // 커스텀 props는 DOM에 전달하지 않음
+    if (prop === "color") {
+      return false;
+    }
+    return typeof defaultValidatorFn === "function"
+      ? defaultValidatorFn(prop)
+      : true;
+  },
+})`
   width: 16px;
   height: 16px;
   border-radius: ${({ theme }) => theme.borderRadius.sm};
   background-color: ${({ color }) => color};
-  border: 1px solid
-    ${({ theme, color }) =>
-      color === theme.colors.surfaceLight
-        ? theme.colors.border
-        : "transparent"};
+  border: 1px solid white;
+  margin-right: 4px;
 `;
 
 /**

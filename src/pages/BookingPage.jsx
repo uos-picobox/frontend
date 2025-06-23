@@ -398,7 +398,7 @@ const BookingPage = () => {
     }
   }, [selectedScreening]);
 
-  // 예매 취소 함수
+  // 예매 취소 함수 (먼저 정의)
   const cancelCurrentReservation = useCallback(
     async (reason = "사용자 취소") => {
       if (!currentReservationRef.current) {
@@ -448,107 +448,305 @@ const BookingPage = () => {
     []
   );
 
-  const releaseSelectedSeats = useCallback(async () => {
-    if (!selectedScreening?.screeningId || heldSeatsRef.current.length === 0)
-      return;
-
-    try {
-      await reservationService.releaseSeats({
-        screeningId: selectedScreening.screeningId,
-        seatIds: heldSeatsRef.current,
-      });
-      heldSeatsRef.current = [];
-      if (seatHoldTimeoutRef.current) {
-        clearTimeout(seatHoldTimeoutRef.current);
+  // 🔥 새로운 즉시 좌석 해제 함수 (동기적, 블로킹)
+  const forceReleaseSeatsImmediate = useCallback(
+    async (reason = "강제 해제") => {
+      if (
+        !selectedScreening?.screeningId ||
+        heldSeatsRef.current.length === 0
+      ) {
+        return;
       }
-    } catch (error) {
-      console.error("Failed to release seats:", error);
-    }
-  }, [selectedScreening]);
 
-  // 좌석 해제 및 예매 취소 함수
-  const cleanupReservationAndSeats = useCallback(
-    async (reason = "페이지 이탈") => {
-      console.log("🧹 예매 및 좌석 정리 시작:", reason);
+      const seatsToRelease = [...new Set(heldSeatsRef.current)];
+      console.log(`🚨 즉시 좌석 해제 시작 - ${reason}:`, seatsToRelease);
 
-      // 좌석 해제
-      await releaseSelectedSeats();
+      try {
+        // 여러 방법으로 즉시 해제 시도
+        const releasePromises = [];
 
-      // 예매 취소
-      await cancelCurrentReservation(reason);
-
-      console.log("🧹 예매 및 좌석 정리 완료");
-    },
-    [releaseSelectedSeats, cancelCurrentReservation]
-  );
-
-  // Clean up seat holds when component unmounts or seats change
-  useEffect(() => {
-    return () => {
-      if (seatHoldTimeoutRef.current) {
-        clearTimeout(seatHoldTimeoutRef.current);
-      }
-      if (heldSeatsRef.current.length > 0 && selectedScreening?.screeningId) {
-        // 중복 제거 후 좌석 해제
-        const uniqueHeldSeats = [...new Set(heldSeatsRef.current)];
-        reservationService
-          .releaseSeats({
+        // 1. 일반 API 호출
+        releasePromises.push(
+          reservationService.releaseSeats({
             screeningId: selectedScreening.screeningId,
-            seatIds: uniqueHeldSeats,
-          })
-          .catch((error) => {
-            console.warn("Failed to release seats on unmount:", error);
-            // 언마운트 시에는 에러가 발생해도 무시
-          });
-      }
-    };
-  }, [selectedScreening]);
-
-  // 브라우저 이벤트 처리 (창 닫기, 새로고침, 페이지 이탈)
-  useEffect(() => {
-    const handleBeforeUnload = (event) => {
-      if (currentReservationRef.current?.status === "PENDING_PAYMENT") {
-        // 브라우저가 페이지를 닫기 전에 예매 취소 시도
-        navigator.sendBeacon(
-          "/api/protected/reservations/cancel",
-          JSON.stringify({
-            reservationId: currentReservationRef.current.reservationId,
-            refundReason: "브라우저 창 닫기",
+            seatIds: seatsToRelease,
           })
         );
 
+        // 2. sendBeacon으로도 백업 요청 (브라우저가 닫혀도 전송됨)
+        if (navigator.sendBeacon) {
+          const beaconData = JSON.stringify({
+            screeningId: selectedScreening.screeningId,
+            seatIds: seatsToRelease,
+          });
+
+          navigator.sendBeacon(
+            `/api/protected/reservations/release`,
+            new Blob([beaconData], { type: "application/json" })
+          );
+          console.log(`📡 Beacon 좌석 해제 요청 전송됨`);
+        }
+
+        // 3. Fetch API keepalive로도 백업 (더 안전한 전송)
+        try {
+          fetch("/api/protected/reservations/release", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              screeningId: selectedScreening.screeningId,
+              seatIds: seatsToRelease,
+            }),
+            keepalive: true, // 페이지가 닫혀도 요청 유지
+          }).catch((err) => console.warn("Fetch keepalive 요청 실패:", err));
+
+          console.log(`🔄 Fetch keepalive 좌석 해제 요청 전송됨`);
+        } catch (fetchError) {
+          console.warn("Fetch keepalive 실패:", fetchError);
+        }
+
+        // 일반 API 호출 결과 기다리기 (빠른 응답 기대)
+        await Promise.race([
+          Promise.all(releasePromises),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("타임아웃")), 3000)
+          ),
+        ]);
+
+        heldSeatsRef.current = [];
+        if (seatHoldTimeoutRef.current) {
+          clearTimeout(seatHoldTimeoutRef.current);
+        }
+
+        // 🔥 hold 시간 초기화
+        if (window.seatHoldStartTime) {
+          delete window.seatHoldStartTime;
+          console.log("좌석 hold 시간 기록 초기화");
+        }
+
+        console.log(`✅ 즉시 좌석 해제 완료 - ${reason}`);
+      } catch (error) {
+        console.error(`❌ 즉시 좌석 해제 실패 - ${reason}:`, error);
+
+        // 실패해도 로컬 상태는 정리하고 계속 진행
+        heldSeatsRef.current = [];
+        if (seatHoldTimeoutRef.current) {
+          clearTimeout(seatHoldTimeoutRef.current);
+        }
+
+        // 🔥 hold 시간 초기화
+        if (window.seatHoldStartTime) {
+          delete window.seatHoldStartTime;
+          console.log("좌석 hold 시간 기록 초기화 (실패 시)");
+        }
+      }
+    },
+    [selectedScreening]
+  );
+
+  // 🔥 페이지 이탈 감지 및 즉시 해제 훅
+  useEffect(() => {
+    let isPageUnloading = false;
+    let releaseInterval;
+
+    // 페이지 이탈 전 즉시 해제
+    const handleBeforeUnload = (event) => {
+      isPageUnloading = true;
+
+      const hasHeldSeats = heldSeatsRef.current.length > 0;
+      const hasPendingPayment =
+        currentReservationRef.current?.status === "PENDING_PAYMENT";
+
+      console.log(
+        `🚨 beforeunload 이벤트 - 좌석: ${hasHeldSeats}, 결제: ${hasPendingPayment}`
+      );
+
+      if (hasHeldSeats || hasPendingPayment) {
+        // 동기적으로 즉시 해제 (블로킹)
+        if (hasHeldSeats) {
+          forceReleaseSeatsImmediate("beforeunload");
+        }
+
+        if (hasPendingPayment) {
+          cancelCurrentReservation("beforeunload - 창 닫기").catch(
+            console.error
+          );
+        }
+
+        // 브라우저에 경고 메시지 표시
+        const message = hasPendingPayment
+          ? "결제 진행 중입니다. 페이지를 벗어나면 예매가 취소됩니다."
+          : "선택한 좌석이 있습니다. 페이지를 벗어나면 좌석이 해제됩니다.";
+
         event.preventDefault();
-        event.returnValue =
-          "결제 진행 중입니다. 페이지를 벗어나면 예매가 취소됩니다.";
-        return event.returnValue;
+        event.returnValue = message;
+        return message;
       }
     };
 
-    const handleVisibilityChange = () => {
-      if (
-        document.visibilityState === "hidden" &&
-        currentReservationRef.current?.status === "PENDING_PAYMENT"
-      ) {
-        // 페이지가 숨겨질 때 (탭 변경, 앱 변경 등)
-        cleanupReservationAndSeats("페이지 숨김");
+    // 페이지 숨김 시 즉시 해제 (더 확실함)
+    const handlePageHide = () => {
+      console.log("🚨 pagehide 이벤트");
+      isPageUnloading = true;
+
+      const hasHeldSeats = heldSeatsRef.current.length > 0;
+      const hasPendingPayment =
+        currentReservationRef.current?.status === "PENDING_PAYMENT";
+
+      if (hasHeldSeats) {
+        forceReleaseSeatsImmediate("pagehide");
       }
+
+      if (hasPendingPayment) {
+        cancelCurrentReservation("pagehide - 페이지 숨김").catch(console.error);
+      }
+    };
+
+    // 페이지 가시성 변화 시 즉시 해제
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden" && !isPageUnloading) {
+        console.log("🚨 visibilitychange - hidden");
+
+        const hasHeldSeats = heldSeatsRef.current.length > 0;
+        const hasPendingPayment =
+          currentReservationRef.current?.status === "PENDING_PAYMENT";
+
+        if (hasHeldSeats) {
+          forceReleaseSeatsImmediate("visibilitychange - hidden");
+        }
+
+        if (hasPendingPayment) {
+          cancelCurrentReservation("visibilitychange - 페이지 숨김").catch(
+            console.error
+          );
+        }
+      }
+    };
+
+    // 브라우저 뒤로가기/앞으로가기
+    const handlePopState = () => {
+      console.log("🚨 popstate 이벤트");
+      isPageUnloading = true;
+
+      const hasHeldSeats = heldSeatsRef.current.length > 0;
+      const hasPendingPayment =
+        currentReservationRef.current?.status === "PENDING_PAYMENT";
+
+      if (hasHeldSeats || hasPendingPayment) {
+        if (hasHeldSeats) {
+          forceReleaseSeatsImmediate("popstate - 브라우저 이동");
+        }
+
+        if (hasPendingPayment) {
+          cancelCurrentReservation("popstate - 브라우저 뒤로가기").catch(
+            console.error
+          );
+        }
+      }
+    };
+
+    // 🔥 주기적 백업 해제 (10초마다 체크, 페이지가 활성 상태일 때만)
+    const startBackupReleaseCheck = () => {
+      releaseInterval = setInterval(() => {
+        // 페이지가 언로딩 중이거나 숨겨진 상태가 아닐 때만 실행
+        if (!isPageUnloading && document.visibilityState === "visible") {
+          const hasHeldSeats = heldSeatsRef.current.length > 0;
+
+          if (hasHeldSeats) {
+            console.log("🔄 백업 좌석 상태 체크:", heldSeatsRef.current);
+
+            // 좌석이 10분 이상 hold되었으면 자동 해제
+            const holdStartTime = window.seatHoldStartTime || Date.now();
+            const holdDuration = Date.now() - holdStartTime;
+
+            if (holdDuration > 10 * 60 * 1000) {
+              // 10분
+              console.log("⏰ 좌석 hold 시간 초과, 자동 해제");
+              forceReleaseSeatsImmediate("백업 체크 - 시간 초과");
+            }
+          }
+        }
+      }, 10000); // 10초마다
     };
 
     // 이벤트 리스너 등록
     window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("pagehide", handlePageHide);
     document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("popstate", handlePopState);
 
-    // 컴포넌트 언마운트 시 정리
+    // 백업 체크 시작
+    startBackupReleaseCheck();
+
+    // 정리 함수
     return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      isPageUnloading = true;
 
-      // 컴포넌트 언마운트 시에도 예매 취소
-      if (currentReservationRef.current?.status === "PENDING_PAYMENT") {
-        cleanupReservationAndSeats("컴포넌트 언마운트");
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("pagehide", handlePageHide);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("popstate", handlePopState);
+
+      if (releaseInterval) {
+        clearInterval(releaseInterval);
+      }
+
+      // 컴포넌트 언마운트 시 최종 정리
+      const hasHeldSeats = heldSeatsRef.current.length > 0;
+      const hasPendingPayment =
+        currentReservationRef.current?.status === "PENDING_PAYMENT";
+
+      if (hasHeldSeats || hasPendingPayment) {
+        console.log("🧹 컴포넌트 언마운트 - 최종 정리");
+
+        if (hasHeldSeats) {
+          forceReleaseSeatsImmediate("컴포넌트 언마운트");
+        }
+
+        if (hasPendingPayment) {
+          cancelCurrentReservation("컴포넌트 언마운트").catch(console.error);
+        }
       }
     };
-  }, [cleanupReservationAndSeats]);
+  }, [forceReleaseSeatsImmediate, cancelCurrentReservation]);
+
+  // 🔥 개선된 releaseSelectedSeats (기존 함수는 유지하되 즉시 해제 로직 추가)
+  const releaseSelectedSeats = useCallback(async () => {
+    if (!selectedScreening?.screeningId || heldSeatsRef.current.length === 0)
+      return;
+
+    // 즉시 해제 시도
+    await forceReleaseSeatsImmediate("일반 좌석 해제");
+  }, [selectedScreening, forceReleaseSeatsImmediate]);
+
+  // 좌석 해제 및 예매 취소 통합 함수
+  const cleanupReservationAndSeats = useCallback(
+    async (reason = "페이지 이탈") => {
+      console.log("🧹 예매 및 좌석 정리 시작:", reason);
+
+      // 병렬로 좌석 해제와 예매 취소 진행
+      const promises = [];
+
+      if (heldSeatsRef.current.length > 0) {
+        promises.push(forceReleaseSeatsImmediate(reason));
+      }
+
+      if (currentReservationRef.current) {
+        promises.push(cancelCurrentReservation(reason));
+      }
+
+      if (promises.length > 0) {
+        try {
+          await Promise.all(promises);
+          console.log("🧹 예매 및 좌석 정리 완료:", reason);
+        } catch (error) {
+          console.warn("🧹 예매 및 좌석 정리 중 일부 실패:", error);
+        }
+      }
+    },
+    [forceReleaseSeatsImmediate, cancelCurrentReservation]
+  );
 
   const handleDateSelect = useCallback((date) => setSelectedDate(date), []);
 
@@ -789,6 +987,16 @@ const BookingPage = () => {
         heldSeatsRef.current = [
           ...new Set([...heldSeatsRef.current, ...seatsToHold]),
         ];
+
+        // 🔥 좌석 hold 시작 시간 기록 (백업 해제용)
+        if (heldSeatsRef.current.length > 0 && !window.seatHoldStartTime) {
+          window.seatHoldStartTime = Date.now();
+          console.log(
+            "좌석 hold 시간 기록 시작:",
+            new Date(window.seatHoldStartTime)
+          );
+        }
+
         console.log("Currently held seats:", heldSeatsRef.current);
 
         // Reset timeout for all held seats

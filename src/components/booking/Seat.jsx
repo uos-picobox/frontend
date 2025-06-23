@@ -2,7 +2,17 @@
 import React from "react";
 import styled, { css } from "styled-components";
 
-const SeatButton = styled.button`
+const SeatButton = styled.button.withConfig({
+  shouldForwardProp: (prop, defaultValidatorFn) => {
+    // 커스텀 props는 DOM에 전달하지 않음
+    if (prop === "status") {
+      return false;
+    }
+    return typeof defaultValidatorFn === "function"
+      ? defaultValidatorFn(prop)
+      : true;
+  },
+})`
   width: 32px; /* md:w-8 */
   height: 32px; /* md:h-8 */
   border-radius: ${({ theme }) => theme.borderRadius.sm};
