@@ -1,6 +1,7 @@
 // src/components/movie/MovieDetailsDisplay.js
 import React from "react";
 import styled from "styled-components";
+import { useNavigate } from "react-router-dom";
 import { formatDate, formatTime } from "../../utils/dateUtils";
 import { PLACEHOLDER_POSTER_URL } from "../../constants/config";
 
@@ -106,6 +107,20 @@ const CastList = styled.div`
   }
 `;
 
+const ActorSpan = styled.span`
+  background-color: ${({ theme }) => theme.colors.surfaceLight};
+  padding: ${({ theme }) => theme.spacing[1]} ${({ theme }) => theme.spacing[2]};
+  border-radius: ${({ theme }) => theme.borderRadius.sm};
+  font-size: ${({ theme }) => theme.fontSizes.xs};
+  cursor: pointer;
+  transition: background-color 0.2s;
+
+  &:hover {
+    background-color: ${({ theme }) => theme.colors.primary + "33"};
+    color: ${({ theme }) => theme.colors.primaryLight};
+  }
+`;
+
 const GenresList = styled(CastList)`
   span {
     background-color: ${({ theme }) => theme.colors.primary + "33"};
@@ -126,6 +141,8 @@ const Description = styled.p`
  * @param {MovieResponseDto} props.movie - The detailed movie data.
  */
 const MovieDetailsDisplay = ({ movie }) => {
+  const navigate = useNavigate();
+
   if (!movie) return <p>영화를 불러오는 중...</p>; // Or a more sophisticated loader
 
   const handleImageError = (e) => {
@@ -134,6 +151,10 @@ const MovieDetailsDisplay = ({ movie }) => {
       600,
       movie.title.substring(0, 10)
     );
+  };
+
+  const handleActorClick = (actorId) => {
+    navigate(`/actors/${actorId}`);
   };
 
   // MovieResponseDto has voteAverage
@@ -202,9 +223,12 @@ const MovieDetailsDisplay = ({ movie }) => {
             <strong>출연:</strong>
             <CastList>
               {movie.movieCasts.map((castMember) => (
-                <span key={castMember.actor.actorId}>
+                <ActorSpan
+                  key={castMember.actor.actorId}
+                  onClick={() => handleActorClick(castMember.actor.actorId)}
+                >
                   {castMember.actor.name} ({castMember.role})
-                </span>
+                </ActorSpan>
               ))}
             </CastList>
           </InfoBlock>

@@ -94,6 +94,23 @@ const AdminLoginPage = () => {
           {isLoadingAuth ? "로그인 중..." : "로그인"}
         </Button>
       </Form>
+      <div
+        style={{ textAlign: "center", marginTop: "1.5rem", fontSize: "0.9rem" }}
+      >
+        관리자 계정이 없으신가요?{" "}
+        <a
+          href="/admin/signup"
+          style={{
+            color: "#3b82f6",
+            textDecoration: "none",
+            fontWeight: "500",
+          }}
+          onMouseOver={(e) => (e.target.style.textDecoration = "underline")}
+          onMouseOut={(e) => (e.target.style.textDecoration = "none")}
+        >
+          관리자 회원가입
+        </a>
+      </div>
     </AdminLoginPageWrapper>
   );
 };

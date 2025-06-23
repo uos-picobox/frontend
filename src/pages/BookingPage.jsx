@@ -434,40 +434,29 @@ const BookingPage = () => {
     }
 
     try {
-      // Create reservation
-      const tickets = selectedSeats.map((seatIdentifier, index) => {
+      // Prepare seat IDs
+      const seatIds = selectedSeats.map((seatIdentifier) => {
         const seatId =
           typeof seatIdentifier === "string"
             ? screeningSeatsData?.seats?.find(
                 (s) => s.seatNumber === seatIdentifier
               )?.seatId || seatIdentifier
             : seatIdentifier;
-
-        // Distribute ticket types among selected seats
-        const ticketTypeEntries = Object.entries(ticketCounts).filter(
-          ([_, count]) => count > 0
-        );
-        let currentIndex = 0;
-        let ticketTypeId = null;
-
-        for (const [ttId, count] of ticketTypeEntries) {
-          if (index >= currentIndex && index < currentIndex + count) {
-            ticketTypeId = parseInt(ttId);
-            break;
-          }
-          currentIndex += count;
-        }
-
-        return {
-          seatId: seatId,
-          ticketTypeId: ticketTypeId || parseInt(Object.keys(ticketCounts)[0]),
-        };
+        return parseInt(seatId);
       });
+
+      // Prepare ticket types with counts (백엔드 API 명세에 맞는 형식)
+      const ticketTypes = Object.entries(ticketCounts)
+        .filter(([_, count]) => count > 0)
+        .map(([ticketTypeId, count]) => ({
+          ticketTypeId: parseInt(ticketTypeId),
+          count: count,
+        }));
 
       const reservationData = {
         screeningId: selectedScreening.screeningId,
-        tickets: tickets,
-        usedPoints: 0, // For now, no points usage
+        ticketTypes: ticketTypes,
+        seatIds: seatIds,
       };
 
       console.log("Creating reservation with data:", reservationData);

@@ -15,71 +15,161 @@ export const mockPublicActorsData = [
     actorId: 101,
     name: "안야 테일러-조이",
     birthDate: "1996-04-16",
-    biography: "배우",
-    profileImageUrl: "https://placehold.co/100x100/FFC0CB/000000?text=AnyaM",
+    biography:
+      "미국에서 태어나 아르헨티나와 영국에서 자란 배우. 《퀸스 갬빗》으로 세계적인 명성을 얻었으며, 독특한 매력과 뛰어난 연기력으로 주목받고 있는 젊은 배우입니다.",
+    profileImageUrl: "https://placehold.co/300x300/FFC0CB/000000?text=AnyaM",
+    filmography: [
+      {
+        movieId: 1,
+        title: "퓨리오사: 매드맥스 사가",
+        releaseYear: 2024,
+        posterUrl: "https://placehold.co/200x300/1a202c/ffffff?text=Furiosa",
+      },
+    ],
   },
   {
     actorId: 102,
     name: "크리스 헴스워스",
     birthDate: "1983-08-11",
-    biography: "배우",
-    profileImageUrl: "https://placehold.co/100x100/ADD8E6/000000?text=ChrisM",
+    biography:
+      "호주 출신 배우로 마블 시네마틱 유니버스의 토르 역으로 유명합니다. 액션 영화뿐만 아니라 다양한 장르의 작품에서 활약하고 있는 할리우드 스타입니다.",
+    profileImageUrl: "https://placehold.co/300x300/ADD8E6/000000?text=ChrisM",
+    filmography: [
+      {
+        movieId: 1,
+        title: "퓨리오사: 매드맥스 사가",
+        releaseYear: 2024,
+        posterUrl: "https://placehold.co/200x300/1a202c/ffffff?text=Furiosa",
+      },
+    ],
   },
   {
     actorId: 103,
     name: "톰 버크",
     birthDate: "1981-06-30",
-    biography: "배우",
-    profileImageUrl: "https://placehold.co/100x100/90EE90/000000?text=TomM",
+    biography:
+      "영국 출신 배우로 텔레비전과 영화 모두에서 활약하고 있습니다. 섬세한 연기력과 카리스마로 많은 작품에서 인상깊은 연기를 보여주고 있습니다.",
+    profileImageUrl: "https://placehold.co/300x300/90EE90/000000?text=TomM",
+    filmography: [
+      {
+        movieId: 1,
+        title: "퓨리오사: 매드맥스 사가",
+        releaseYear: 2024,
+        posterUrl: "https://placehold.co/200x300/1a202c/ffffff?text=Furiosa",
+      },
+    ],
   },
   {
     actorId: 104,
     name: "마동석",
     birthDate: "1971-03-01",
-    biography: "배우",
-    profileImageUrl: "https://placehold.co/100x100/FFFFE0/000000?text=MaM",
+    biography:
+      "한국을 대표하는 액션 배우 중 한 명으로, 《범죄도시》 시리즈를 통해 독보적인 캐릭터를 구축했습니다. 강인한 외모와 유머러스한 연기로 많은 사랑을 받고 있습니다.",
+    profileImageUrl: "https://placehold.co/300x300/FFFFE0/000000?text=MaM",
+    filmography: [
+      {
+        movieId: 2,
+        title: "범죄도시4",
+        releaseYear: 2024,
+        posterUrl: "https://placehold.co/200x300/2d3748/ffffff?text=Roundup4",
+      },
+    ],
   },
   {
     actorId: 105,
     name: "김무열",
     birthDate: "1982-05-22",
-    biography: "배우",
-    profileImageUrl: "https://placehold.co/100x100/E6E6FA/000000?text=KimM",
+    biography:
+      "다양한 장르의 영화와 드라마에서 활약하고 있는 실력파 배우입니다. 특히 액션과 범죄 장르에서 뛰어난 연기력을 보여주며 많은 인정을 받고 있습니다.",
+    profileImageUrl: "https://placehold.co/300x300/E6E6FA/000000?text=KimM",
+    filmography: [
+      {
+        movieId: 2,
+        title: "범죄도시4",
+        releaseYear: 2024,
+        posterUrl: "https://placehold.co/200x300/2d3748/ffffff?text=Roundup4",
+      },
+    ],
   },
   {
     actorId: 106,
     name: "박지환",
     birthDate: "1980-09-05",
-    biography: "배우",
-    profileImageUrl: "https://placehold.co/100x100/DDA0DD/000000?text=ParkM",
+    biography:
+      "영화와 드라마를 오가며 다양한 캐릭터를 소화하는 실력파 배우입니다. 특히 악역 연기에서 강한 인상을 남기며 관객들에게 기억되고 있습니다.",
+    profileImageUrl: "https://placehold.co/300x300/DDA0DD/000000?text=ParkM",
+    filmography: [
+      {
+        movieId: 2,
+        title: "범죄도시4",
+        releaseYear: 2024,
+        posterUrl: "https://placehold.co/200x300/2d3748/ffffff?text=Roundup4",
+      },
+    ],
   },
   {
     actorId: 107,
     name: "이동휘",
     birthDate: "1985-07-22",
-    biography: "배우",
-    profileImageUrl: "https://placehold.co/100x100/DB7093/000000?text=LeeM",
+    biography:
+      "코미디부터 시리어스한 연기까지 폭넓은 스펙트럼을 보여주는 배우입니다. 특유의 유머와 진중함을 오가는 연기로 많은 작품에서 사랑받고 있습니다.",
+    profileImageUrl: "https://placehold.co/300x300/DB7093/000000?text=LeeM",
+    filmography: [
+      {
+        movieId: 2,
+        title: "범죄도시4",
+        releaseYear: 2024,
+        posterUrl: "https://placehold.co/200x300/2d3748/ffffff?text=Roundup4",
+      },
+    ],
   },
   {
     actorId: 108,
     name: "변요한",
     birthDate: "1986-04-29",
-    biography: "배우",
-    profileImageUrl: "https://placehold.co/100x100/FFDAB9/000000?text=ByunM",
+    biography:
+      "섬세하고 자연스러운 연기로 호평받는 배우입니다. 다양한 장르에서 독특한 캐릭터를 만들어내며 한국 영화계의 주목받는 배우 중 한 명입니다.",
+    profileImageUrl: "https://placehold.co/300x300/FFDAB9/000000?text=ByunM",
+    filmography: [
+      {
+        movieId: 3,
+        title: "그녀가 죽었다",
+        releaseYear: 2024,
+        posterUrl: "https://placehold.co/200x300/4a5568/ffffff?text=SheM",
+      },
+    ],
   },
   {
     actorId: 109,
     name: "신혜선",
     birthDate: "1989-08-31",
-    biography: "배우",
-    profileImageUrl: "https://placehold.co/100x100/87CEFA/000000?text=ShinM",
+    biography:
+      "드라마와 영화를 오가며 다양한 연기를 보여주는 배우입니다. 특히 감정 연기에서 뛰어난 실력을 보여주며 많은 관객들의 사랑을 받고 있습니다.",
+    profileImageUrl: "https://placehold.co/300x300/87CEFA/000000?text=ShinM",
+    filmography: [
+      {
+        movieId: 3,
+        title: "그녀가 죽었다",
+        releaseYear: 2024,
+        posterUrl: "https://placehold.co/200x300/4a5568/ffffff?text=SheM",
+      },
+    ],
   },
   {
     actorId: 110,
     name: "이엘",
     birthDate: "1982-08-26",
-    biography: "배우",
-    profileImageUrl: "https://placehold.co/100x100/F0E68C/000000?text=LeeElM",
+    biography:
+      "가수 출신으로 연기자로 전향하여 성공적인 커리어를 쌓고 있는 멀티 아티스트입니다. 음악과 연기 모두에서 뛰어난 재능을 보여주고 있습니다.",
+    profileImageUrl: "https://placehold.co/300x300/F0E68C/000000?text=LeeElM",
+    filmography: [
+      {
+        movieId: 3,
+        title: "그녀가 죽었다",
+        releaseYear: 2024,
+        posterUrl: "https://placehold.co/200x300/4a5568/ffffff?text=SheM",
+      },
+    ],
   },
 ];
 

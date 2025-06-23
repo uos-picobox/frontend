@@ -16,12 +16,16 @@ import Footer from "./components/layout/Footer";
 import HomePage from "./pages/HomePage";
 import MovieListPage from "./pages/MovieListPage";
 import MovieDetailPage from "./pages/MovieDetailPage";
+import ActorDetailPage from "./pages/ActorDetailPage";
 import BookingPage from "./pages/BookingPage";
 import BookingSelectPage from "./pages/BookingSelectPage";
 import ProfilePage from "./pages/ProfilePage";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import FindLoginIdPage from "./pages/FindLoginIdPage";
 import AdminLoginPage from "./pages/AdminLoginPage";
+import AdminSignupPage from "./pages/AdminSignupPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 import NotFoundPage from "./pages/NotFoundPage";
 
@@ -62,14 +66,31 @@ const UserProtectedRoute = ({ children }) => {
   const { user, sessionId, isLoadingAuth } = useAuth();
   const location = useLocation();
 
+  console.log(
+    "UserProtectedRoute check - isLoadingAuth:",
+    isLoadingAuth,
+    "user:",
+    !!user,
+    "sessionId:",
+    !!sessionId
+  );
+
   if (isLoadingAuth) {
     return <p>인증 정보 확인 중...</p>;
   }
 
-  if (!sessionId || !user) {
-    // Check for sessionId and user object
+  // 더 관대한 조건으로 변경 - user만 있으면 접근 허용
+  if (!user) {
+    console.log("UserProtectedRoute: No user, redirecting to login");
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
+
+  if (!sessionId) {
+    console.warn(
+      "UserProtectedRoute: No sessionId but user exists, allowing access"
+    );
+  }
+
   return children;
 };
 
@@ -114,6 +135,7 @@ function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/movies" element={<MovieListPage />} />
           <Route path="/movies/:movieId" element={<MovieDetailPage />} />
+          <Route path="/actors/:actorId" element={<ActorDetailPage />} />
 
           {/* BookingSelectPage - Shows all movies for booking selection */}
           <Route path="/booking" element={<BookingSelectPage />} />
@@ -131,9 +153,12 @@ function App() {
 
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/find-login-id" element={<FindLoginIdPage />} />
 
           {/* Admin Routes */}
           <Route path="/admin/login" element={<AdminLoginPage />} />
+          <Route path="/admin/signup" element={<AdminSignupPage />} />
           <Route
             path="/admin/*" // Catch all routes under /admin
             element={

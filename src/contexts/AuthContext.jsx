@@ -21,13 +21,27 @@ export const AuthProvider = ({ children }) => {
       const storedSessionId = localStorage.getItem("sessionId");
       const storedExpiresAt = localStorage.getItem("sessionExpiresAt");
 
+      console.log(
+        "AuthContext: Loading from storage - sessionId:",
+        !!storedSessionId,
+        "expiresAt:",
+        storedExpiresAt
+      );
+
       // 세션 만료 확인
       if (storedSessionId && storedExpiresAt) {
         const expiryTime = new Date(storedExpiresAt);
         const now = new Date();
 
+        console.log(
+          "AuthContext: Session check - now:",
+          now.toISOString(),
+          "expires:",
+          expiryTime.toISOString()
+        );
+
         if (now >= expiryTime) {
-          console.log("Session expired, clearing stored data");
+          console.log("AuthContext: Session expired, clearing stored data");
           localStorage.removeItem("sessionId");
           localStorage.removeItem("sessionExpiresAt");
           localStorage.removeItem("userData");
@@ -38,6 +52,8 @@ export const AuthProvider = ({ children }) => {
           setIsLoadingAuth(false);
           return;
         }
+      } else if (storedSessionId && !storedExpiresAt) {
+        console.warn("AuthContext: sessionId exists but no expiry time found");
       }
 
       if (storedSessionId) {
@@ -107,12 +123,13 @@ export const AuthProvider = ({ children }) => {
 
   const handleLoginResponse = (response, isAdminLoginAttempt = false) => {
     console.log(
-      "handleLoginResponse called with:",
+      "AuthContext: handleLoginResponse called with:",
       response,
       isAdminLoginAttempt
     );
 
     if (response && response.sessionId) {
+      console.log("AuthContext: Setting sessionId:", response.sessionId);
       setSessionId(response.sessionId);
       localStorage.setItem("sessionId", response.sessionId);
 
@@ -137,12 +154,17 @@ export const AuthProvider = ({ children }) => {
         }
 
         console.log(
-          "Login successful - User:",
+          "AuthContext: Login successful - User:",
           response.user,
           "IsAdmin:",
-          determinedIsAdmin
+          determinedIsAdmin,
+          "SessionId set:",
+          !!response.sessionId
         );
       } else {
+        console.log(
+          "AuthContext: No user data in response, setting basic state"
+        );
         setUser(null);
         setIsAdmin(isAdminLoginAttempt);
         if (isAdminLoginAttempt)
@@ -157,6 +179,13 @@ export const AuthProvider = ({ children }) => {
         else localStorage.removeItem("adminData");
         localStorage.removeItem("userData");
       }
+
+      console.log(
+        "AuthContext: Final state after login - sessionId:",
+        response.sessionId,
+        "user:",
+        !!response.user
+      );
       return true;
     }
     setAuthError(response?.message || "로그인 응답 형식이 올바르지 않습니다.");
@@ -318,6 +347,29 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  const getMyProfile = useCallback(async () => {
+    try {
+      const profile = await authService.getMyProfile();
+      return profile;
+    } catch (error) {
+      console.error("프로필 조회 오류:", error);
+      throw error;
+    }
+  }, []);
+
+  const updateMyProfile = useCallback(async (profileData) => {
+    try {
+      const updatedProfile = await authService.updateMyProfile(profileData);
+      // 업데이트된 프로필로 현재 사용자 정보를 갱신
+      setUser(updatedProfile);
+      localStorage.setItem("userData", JSON.stringify(updatedProfile));
+      return updatedProfile;
+    } catch (error) {
+      console.error("프로필 업데이트 오류:", error);
+      throw error;
+    }
+  }, []);
+
   const value = {
     user,
     isAdmin,
@@ -332,6 +384,8 @@ export const AuthProvider = ({ children }) => {
     verifyAuthMail,
     checkLoginId,
     checkEmail,
+    getMyProfile,
+    updateMyProfile,
     clearAuthError: useCallback(() => setAuthError(null), []),
   };
 

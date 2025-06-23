@@ -85,10 +85,13 @@ export const API_ENDPOINTS_ADMIN = {
     `/api/admin/price-settings/delete?roomId=${roomId}&ticketTypeId=${ticketTypeId}`,
 };
 
-export const API_ENDPOINTS_USER = {
+export const API_ENDPOINTS_CUSTOMER = {
   // Public Movie & Screening APIs
   MOVIES_GET_ALL: `/api/movies`,
   MOVIE_GET_BY_ID: (movieId) => `/api/movies/${movieId}`,
+
+  // Public Actor API
+  ACTOR_GET_BY_ID: (actorId) => `/api/actors/get/${actorId}`,
 
   // New Screening APIs
   SCREENINGS_GET_BY_DATE: (date) => `/api/screenings?date=${date}`,
@@ -97,21 +100,67 @@ export const API_ENDPOINTS_USER = {
   SCREENING_SEATS_GET: (screeningId) => `/api/screenings/${screeningId}/seats`,
 
   // Reservation APIs
-  RESERVATIONS_MY: `/api/reservations/my-reservations`,
-  RESERVATIONS_HOLD: `/api/reservations/hold`,
-  RESERVATIONS_RELEASE: `/api/reservations/release`,
-  RESERVATIONS_CREATE: `/api/reservations/create`,
-  RESERVATIONS_COMPLETE: `/api/reservations/complete`,
+  RESERVATIONS_MY: `/api/protected/reservations/my-reservations`,
+  RESERVATIONS_DETAIL: (reservationId) =>
+    `/api/protected/reservations/${reservationId}`,
+  RESERVATIONS_TICKET: (reservationId) =>
+    `/api/protected/reservations/${reservationId}/ticket`,
+  RESERVATIONS_HOLD: `/api/protected/reservations/hold`,
+  RESERVATIONS_RELEASE: `/api/protected/reservations/release`,
+  RESERVATIONS_CREATE: `/api/protected/reservations/create`,
+  RESERVATIONS_COMPLETE: (reservationId) =>
+    `/api/protected/reservations/complete/${reservationId}`,
+  RESERVATIONS_CANCEL: `/api/protected/reservations/cancel`,
 
-  // Signup & Auth related
-  SIGNUP: `/api/user/signup`,
+  // Point APIs
+  POINT_BALANCE: `/api/protected/get/point`,
+  POINT_HISTORY: `/api/protected/get/point-history`,
+
+  // Customer Auth APIs
+  LOGIN: `/api/signin/customer`,
+  LOGOUT: `/api/signout/customer`,
+  SIGNUP: `/api/signup/customer`,
   SIGNUP_CHECK_LOGINID: (loginId) =>
-    `/api/user/signup/check/loginid?loginId=${loginId}`,
-  SIGNUP_CHECK_EMAIL: (email) => `/api/user/signup/check/email?email=${email}`,
-  SIGNUP_REQUEST_EMAIL_VERIFICATION: `/api/user/signup/verify/email`,
-  SIGNUP_AUTH_EMAIL_CODE: `/api/user/signup/auth/email`,
-  LOGIN: `/api/user/signin`, // Updated to new signin endpoint
-  LOGOUT: `/api/user/signout`, // New signout endpoint
+    `/api/signup/customer/check/loginid?loginId=${loginId}`,
+  SIGNUP_CHECK_EMAIL: (email) =>
+    `/api/signup/customer/check/email?email=${email}`,
+  SIGNUP_REQUEST_EMAIL_VERIFICATION: `/api/signup/customer/verify/email`,
+  SIGNUP_AUTH_EMAIL_CODE: `/api/signup/customer/auth/email`,
+
+  // Customer Profile APIs
+  GET_MY_INFO: `/api/protected/customer/get`,
+  UPDATE_MY_INFO: `/api/protected/customer/update`,
+
+  // Password Reset APIs
+  FIND_PASSWORD_VERIFY_EMAIL: `/api/customer/find/password/verify/email`,
+  FIND_PASSWORD_AUTH_EMAIL: `/api/customer/find/password/auth/email`,
+  FIND_PASSWORD_RESET: `/api/customer/find/password/reset`,
+
+  // Find Login ID APIs
+  FIND_LOGINID_VERIFY_EMAIL: `/api/customer/find/login-id/verify/email`,
+  FIND_LOGINID_AUTH_EMAIL: `/api/customer/find/login-id/auth/email`,
+};
+
+export const API_ENDPOINTS_GUEST = {
+  // Guest Auth APIs
+  LOGIN: `/api/signin/guest`,
+  LOGOUT: `/api/signout/guest`,
+  SIGNUP: `/api/signup/guest`,
+  SIGNUP_CHECK_EMAIL: (email) => `/api/signup/guest/check/email?email=${email}`,
+  SIGNUP_REQUEST_EMAIL_VERIFICATION: `/api/signup/guest/verify/email`,
+  SIGNUP_AUTH_EMAIL_CODE: `/api/signup/guest/auth/email`,
+};
+
+export const API_ENDPOINTS_ADMIN_AUTH = {
+  // Admin Auth APIs
+  LOGIN: `/api/signin/admin`,
+  LOGOUT: `/api/signout/admin`,
+  SIGNUP: `/api/signup/admin`,
+  SIGNUP_CHECK_LOGINID: (loginId) =>
+    `/api/signup/admin/check/loginid?loginId=${loginId}`,
+  SIGNUP_CHECK_EMAIL: (email) => `/api/signup/admin/check/email?email=${email}`,
+  SIGNUP_REQUEST_EMAIL_VERIFICATION: `/api/signup/admin/verify/email`,
+  SIGNUP_AUTH_EMAIL_CODE: `/api/signup/admin/auth/email`,
 };
 
 // --- UI Constants & Fallbacks ---

@@ -2,9 +2,9 @@
 import apiClient from "./apiClient";
 import {
   API_ENDPOINTS_ADMIN,
-  API_ENDPOINTS_USER,
+  API_ENDPOINTS_CUSTOMER,
   ensureArray,
-} from "../constants/config"; // API_ENDPOINTS_USER 추가 (공개 API용)
+} from "../constants/config"; // API_ENDPOINTS_CUSTOMER 추가 (공개 API용)
 
 // --- Public/User Facing (Using Real API) ---
 /**
@@ -18,7 +18,7 @@ export const getPublicScreeningsByDate = async (date) => {
   );
   try {
     const screeningsData = await apiClient.get(
-      API_ENDPOINTS_USER.SCREENINGS_GET_BY_DATE(date)
+      API_ENDPOINTS_CUSTOMER.SCREENINGS_GET_BY_DATE(date)
     );
     return ensureArray(screeningsData);
   } catch (error) {
@@ -42,7 +42,7 @@ export const getPublicScreeningsForMovieDate = async (movieId, date) => {
   );
   try {
     const screeningsData = await apiClient.get(
-      API_ENDPOINTS_USER.SCREENINGS_FOR_MOVIE_DATE(movieId, date)
+      API_ENDPOINTS_CUSTOMER.SCREENINGS_FOR_MOVIE_DATE(movieId, date)
     );
     return ensureArray(screeningsData);
   } catch (error) {
@@ -65,7 +65,7 @@ export const getScreeningSeats = async (screeningId) => {
   );
   try {
     const seatData = await apiClient.get(
-      API_ENDPOINTS_USER.SCREENING_SEATS_GET(screeningId)
+      API_ENDPOINTS_CUSTOMER.SCREENING_SEATS_GET(screeningId)
     );
     return seatData;
   } catch (error) {

@@ -2,7 +2,7 @@
 import apiClient from "./apiClient";
 import {
   API_ENDPOINTS_ADMIN,
-  API_ENDPOINTS_USER,
+  API_ENDPOINTS_CUSTOMER,
   ensureArray,
 } from "../constants/config";
 import { mockPublicMovies } from "../constants/mockData";
@@ -11,7 +11,9 @@ import { mockPublicMovies } from "../constants/mockData";
 export const getPublicAllMovies = async () => {
   console.log("movieService: getPublicAllMovies called (using real API)");
   try {
-    const moviesData = await apiClient.get(API_ENDPOINTS_USER.MOVIES_GET_ALL);
+    const moviesData = await apiClient.get(
+      API_ENDPOINTS_CUSTOMER.MOVIES_GET_ALL
+    );
     return ensureArray(moviesData);
   } catch (error) {
     console.error("movieService: getPublicAllMovies error:", error);
@@ -27,7 +29,7 @@ export const getPublicMovieById = async (movieId) => {
   );
   try {
     const movieData = await apiClient.get(
-      API_ENDPOINTS_USER.MOVIE_GET_BY_ID(movieId)
+      API_ENDPOINTS_CUSTOMER.MOVIE_GET_BY_ID(movieId)
     );
     return movieData;
   } catch (error) {
