@@ -1,6 +1,12 @@
 import React, { useState, useEffect, useMemo } from "react";
 import styled from "styled-components";
-import { CreditCard, Smartphone, Building, Globe } from "lucide-react";
+import {
+  CreditCard,
+  Smartphone,
+  Building,
+  Globe,
+  RefreshCw,
+} from "lucide-react";
 import Button from "../common/Button";
 import * as paymentService from "../../services/paymentService";
 import * as pointService from "../../services/pointService";
@@ -41,6 +47,33 @@ const PointSection = styled.div`
   margin-bottom: ${({ theme }) => theme.spacing[4]};
 `;
 
+const PointBalanceWrapper = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: ${({ theme }) => theme.spacing[2]};
+`;
+
+const PointBalanceInfo = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.spacing[2]};
+`;
+
+const PointBalance = styled.span`
+  font-size: ${({ theme }) => theme.fontSizes.base};
+  font-weight: 600;
+  color: ${({ theme }) => theme.colors.primary};
+`;
+
+const RefreshButton = styled(Button).attrs({
+  variant: "outline",
+  size: "sm",
+})`
+  padding: ${({ theme }) => theme.spacing[1]} ${({ theme }) => theme.spacing[2]};
+  font-size: ${({ theme }) => theme.fontSizes.xs};
+`;
+
 const PointInputWrapper = styled.div`
   display: flex;
   align-items: center;
@@ -60,6 +93,11 @@ const PointInput = styled.input`
     outline: none;
     border-color: ${({ theme }) => theme.colors.primary};
   }
+
+  &:disabled {
+    background-color: ${({ theme }) => theme.colors.surfaceLight};
+    cursor: not-allowed;
+  }
 `;
 
 const UseAllPointsButton = styled(Button).attrs({
@@ -73,6 +111,19 @@ const PointInfo = styled.p`
   font-size: ${({ theme }) => theme.fontSizes.xs};
   color: ${({ theme }) => theme.colors.textLighter};
   margin-top: ${({ theme }) => theme.spacing[1]};
+`;
+
+const PointError = styled.p`
+  font-size: ${({ theme }) => theme.fontSizes.xs};
+  color: ${({ theme }) => theme.colors.error};
+  margin-top: ${({ theme }) => theme.spacing[1]};
+`;
+
+const MinAmountWarning = styled.p`
+  font-size: ${({ theme }) => theme.fontSizes.xs};
+  color: ${({ theme }) => theme.colors.warning || "#f59e0b"};
+  margin-top: ${({ theme }) => theme.spacing[1]};
+  font-weight: 500;
 `;
 
 const PaymentMethodSection = styled.div`
@@ -172,48 +223,146 @@ const PaymentSection = ({
   const [usePoints, setUsePoints] = useState(0);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("CARD");
   const [isLoading, setIsLoading] = useState(false);
+  const [pointError, setPointError] = useState("");
+  const [isRefreshingPoints, setIsRefreshingPoints] = useState(false);
+
+  // 최소 결제 금액 (Toss Payments 기준)
+  const MIN_PAYMENT_AMOUNT = 100;
 
   // Load discounts and points on mount
   useEffect(() => {
-    const loadPaymentOptions = async () => {
-      setIsLoading(true);
-      try {
-        const [discountData, pointData] = await Promise.all([
-          paymentService.getDiscountList(),
-          pointService.getPointBalance(),
-        ]);
-
-        setDiscounts(discountData || []);
-        setAvailablePoints(pointData?.balance || 0);
-      } catch (error) {
-        console.error("Failed to load payment options:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     loadPaymentOptions();
   }, []);
 
-  // Calculate final amount
-  const discountAmount = selectedDiscount
-    ? selectedDiscount.discountAmount ||
-      Math.floor(originalAmount * (selectedDiscount.discountRate / 100))
-    : 0;
+  const loadPaymentOptions = async () => {
+    setIsLoading(true);
+    setPointError("");
 
+    try {
+      const [discountData, pointData] = await Promise.all([
+        paymentService.getDiscountList(),
+        loadPointBalance(),
+      ]);
+
+      setDiscounts(discountData || []);
+    } catch (error) {
+      console.error("Failed to load payment options:", error);
+      setPointError("결제 정보를 불러오는 중 오류가 발생했습니다.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadPointBalance = async () => {
+    try {
+      const pointData = await pointService.getPointBalance();
+      console.log("Point balance data:", pointData);
+
+      // 포인트 잔액 추출 (다양한 응답 형태 지원)
+      let balance = 0;
+      if (pointData) {
+        if (typeof pointData === "number") {
+          balance = pointData;
+        } else if (typeof pointData === "object") {
+          balance =
+            pointData.balance ||
+            pointData.points ||
+            pointData.point ||
+            pointData.amount ||
+            pointData.value ||
+            0;
+        }
+      }
+
+      // 음수나 NaN 방지
+      balance = Math.max(0, parseInt(balance) || 0);
+
+      setAvailablePoints(balance);
+      console.log("Available points set to:", balance);
+
+      return balance;
+    } catch (error) {
+      console.error("Failed to load point balance:", error);
+      setPointError("포인트 잔액을 불러올 수 없습니다.");
+      setAvailablePoints(0);
+      return 0;
+    }
+  };
+
+  const refreshPointBalance = async () => {
+    setIsRefreshingPoints(true);
+    setPointError("");
+
+    try {
+      await loadPointBalance();
+    } catch (error) {
+      console.error("Failed to refresh point balance:", error);
+      setPointError("포인트 잔액을 새로고침하는 중 오류가 발생했습니다.");
+    } finally {
+      setIsRefreshingPoints(false);
+    }
+  };
+
+  // Calculate discount amount
+  const discountAmount = useMemo(() => {
+    if (!selectedDiscount) return 0;
+
+    if (selectedDiscount.discountAmount) {
+      return Math.min(selectedDiscount.discountAmount, originalAmount);
+    }
+
+    if (selectedDiscount.discountRate) {
+      return Math.floor(originalAmount * (selectedDiscount.discountRate / 100));
+    }
+
+    return 0;
+  }, [selectedDiscount, originalAmount]);
+
+  // Calculate amounts
   const afterDiscountAmount = originalAmount - discountAmount;
+  const maxUsablePoints = Math.min(availablePoints, afterDiscountAmount);
   const finalAmount = Math.max(0, afterDiscountAmount - usePoints);
 
-  // Handle point input
+  // Validate if final amount meets minimum payment requirement
+  const isValidPaymentAmount =
+    finalAmount === 0 || finalAmount >= MIN_PAYMENT_AMOUNT;
+  const needsMinAmountAdjustment =
+    finalAmount > 0 && finalAmount < MIN_PAYMENT_AMOUNT;
+
+  // Handle point input with validation
   const handlePointChange = (e) => {
     const value = parseInt(e.target.value) || 0;
-    const maxPoints = Math.min(availablePoints, afterDiscountAmount);
-    setUsePoints(Math.min(value, maxPoints));
+    const validatedValue = Math.min(Math.max(0, value), maxUsablePoints);
+
+    setUsePoints(validatedValue);
+    setPointError("");
+
+    // Check if the resulting amount would be below minimum
+    const resultingAmount = afterDiscountAmount - validatedValue;
+    if (resultingAmount > 0 && resultingAmount < MIN_PAYMENT_AMOUNT) {
+      setPointError(
+        `최소 결제 금액 ${MIN_PAYMENT_AMOUNT}원을 만족하려면 포인트를 ${
+          afterDiscountAmount - MIN_PAYMENT_AMOUNT
+        }P 이하로 사용하거나 전액 사용해주세요.`
+      );
+    }
   };
 
   const handleUseAllPoints = () => {
     const maxPoints = Math.min(availablePoints, afterDiscountAmount);
     setUsePoints(maxPoints);
+    setPointError("");
+  };
+
+  // Suggest optimal point usage for minimum payment
+  const handleOptimalPointUsage = () => {
+    if (needsMinAmountAdjustment) {
+      const optimalPoints = afterDiscountAmount - MIN_PAYMENT_AMOUNT;
+      if (optimalPoints >= 0 && optimalPoints <= availablePoints) {
+        setUsePoints(optimalPoints);
+        setPointError("");
+      }
+    }
   };
 
   // Handle payment method selection
@@ -222,24 +371,32 @@ const PaymentSection = ({
   };
 
   // Memoize payment data to prevent unnecessary re-renders
-  const paymentData = useMemo(
-    () => ({
+  const paymentData = useMemo(() => {
+    const data = {
       paymentMethod: selectedPaymentMethod,
       selectedDiscount,
       usePoints,
       originalAmount,
       discountAmount,
       finalAmount,
-    }),
-    [
-      selectedPaymentMethod,
-      selectedDiscount,
-      usePoints,
-      originalAmount,
-      discountAmount,
-      finalAmount,
-    ]
-  );
+      isValidPayment: isValidPaymentAmount,
+      availablePoints,
+      maxUsablePoints,
+    };
+
+    console.log("Payment data updated:", data);
+    return data;
+  }, [
+    selectedPaymentMethod,
+    selectedDiscount,
+    usePoints,
+    originalAmount,
+    discountAmount,
+    finalAmount,
+    isValidPaymentAmount,
+    availablePoints,
+    maxUsablePoints,
+  ]);
 
   // Notify parent component about payment readiness
   useEffect(() => {
@@ -273,12 +430,16 @@ const PaymentSection = ({
                 (d) => d.id.toString() === discountId
               );
               setSelectedDiscount(discount || null);
+              // Reset points when discount changes
+              setUsePoints(0);
+              setPointError("");
             }}
+            disabled={isProcessing}
           >
             <option value="">할인 선택 안함</option>
             {discounts.map((discount) => (
               <option key={discount.id} value={discount.id}>
-                {discount.providerName} - {discount.description}(
+                {discount.providerName} - {discount.description} (
                 {discount.discountRate
                   ? `${discount.discountRate}%`
                   : `${discount.discountAmount?.toLocaleString()}원`}{" "}
@@ -290,29 +451,83 @@ const PaymentSection = ({
       )}
 
       {/* Point Usage */}
-      {availablePoints > 0 && (
-        <PointSection>
+      <PointSection>
+        <PointBalanceWrapper>
           <label>포인트 사용</label>
-          <PointInputWrapper>
-            <PointInput
-              type="number"
-              value={usePoints}
-              onChange={handlePointChange}
-              placeholder="사용할 포인트"
-              min="0"
-              max={Math.min(availablePoints, afterDiscountAmount)}
-            />
-            <UseAllPointsButton onClick={handleUseAllPoints}>
-              전액 사용
-            </UseAllPointsButton>
-          </PointInputWrapper>
+          <PointBalanceInfo>
+            <PointBalance>
+              보유: {availablePoints.toLocaleString()}P
+            </PointBalance>
+            <RefreshButton
+              onClick={refreshPointBalance}
+              disabled={isRefreshingPoints || isProcessing}
+            >
+              <RefreshCw size={12} />
+              {isRefreshingPoints ? "새로고침중" : "새로고침"}
+            </RefreshButton>
+          </PointBalanceInfo>
+        </PointBalanceWrapper>
+
+        {availablePoints > 0 ? (
+          <>
+            <PointInputWrapper>
+              <PointInput
+                type="number"
+                value={usePoints}
+                onChange={handlePointChange}
+                placeholder="사용할 포인트"
+                min="0"
+                max={maxUsablePoints}
+                disabled={isProcessing}
+              />
+              <UseAllPointsButton
+                onClick={handleUseAllPoints}
+                disabled={isProcessing || maxUsablePoints === 0}
+              >
+                전액 사용
+              </UseAllPointsButton>
+            </PointInputWrapper>
+
+            <PointInfo>
+              최대 {maxUsablePoints.toLocaleString()}P 사용 가능
+              {needsMinAmountAdjustment && (
+                <>
+                  <br />
+                  <Button
+                    variant="text"
+                    size="sm"
+                    onClick={handleOptimalPointUsage}
+                    style={{
+                      padding: "0",
+                      fontSize: "inherit",
+                      textDecoration: "underline",
+                    }}
+                  >
+                    {(
+                      afterDiscountAmount - MIN_PAYMENT_AMOUNT
+                    ).toLocaleString()}
+                    P 사용하여 최소 결제금액 맞추기
+                  </Button>
+                </>
+              )}
+            </PointInfo>
+
+            {pointError && <PointError>{pointError}</PointError>}
+
+            {needsMinAmountAdjustment && (
+              <MinAmountWarning>
+                ⚠️ 최소 결제 금액은 {MIN_PAYMENT_AMOUNT}원입니다. 포인트를
+                조정하거나 전액 사용해주세요.
+              </MinAmountWarning>
+            )}
+          </>
+        ) : (
           <PointInfo>
-            보유 포인트: {availablePoints.toLocaleString()}P (최대{" "}
-            {Math.min(availablePoints, afterDiscountAmount).toLocaleString()}P
-            사용 가능)
+            사용 가능한 포인트가 없습니다.
+            {pointError && <PointError>{pointError}</PointError>}
           </PointInfo>
-        </PointSection>
-      )}
+        )}
+      </PointSection>
 
       {/* Payment Method Selection */}
       <PaymentMethodSection>
@@ -354,7 +569,24 @@ const PaymentSection = ({
         )}
         <FinalPriceRow>
           <span>최종 결제 금액</span>
-          <span>{finalAmount.toLocaleString()}원</span>
+          <span
+            style={{
+              color: !isValidPaymentAmount ? "#dc3545" : undefined,
+            }}
+          >
+            {finalAmount.toLocaleString()}원
+            {!isValidPaymentAmount && finalAmount > 0 && (
+              <small
+                style={{
+                  display: "block",
+                  fontSize: "0.7em",
+                  fontWeight: "normal",
+                }}
+              >
+                (최소 {MIN_PAYMENT_AMOUNT}원 필요)
+              </small>
+            )}
+          </span>
         </FinalPriceRow>
       </PriceBreakdown>
     </PaymentWrapper>

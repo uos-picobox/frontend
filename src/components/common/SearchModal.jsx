@@ -345,10 +345,10 @@ const SearchModal = ({ isOpen, onClose }) => {
 
             <SearchHint>
               {isChoseongSearch
-                ? `"${query}" - 초성 검색 중입니다`
+                ? `"${query}" - 검색 중입니다`
                 : query
                 ? `"${query}" 검색 결과`
-                : "영화 제목이나 배우 이름으로 검색하거나, 초성(ㄱㄴㄷ)으로도 검색할 수 있습니다"}
+                : "영화 제목이나 배우 이름으로 검색할 수 있습니다"}
             </SearchHint>
 
             {loading && <LoadingSpinner>검색 중...</LoadingSpinner>}

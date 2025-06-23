@@ -17,6 +17,7 @@ import {
   MessageSquare,
   Percent,
   UserCheck,
+  UserX,
 } from "lucide-react";
 
 const SidebarWrapper = styled.aside`
@@ -152,6 +153,16 @@ const AdminSidebar = () => {
           path: "/admin/customers",
           label: "고객 관리",
           icon: <UserCheck />,
+        },
+      ],
+    },
+    {
+      group: "계정 관리",
+      items: [
+        {
+          path: "/admin/delete-account",
+          label: "관리자 탈퇴",
+          icon: <UserX />,
         },
       ],
     },

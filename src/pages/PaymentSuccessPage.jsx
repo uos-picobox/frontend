@@ -217,12 +217,29 @@ const PaymentSuccessPage = () => {
             }
           }
 
+          // Get saved payment data for additional info
+          const savedPaymentDataStr = localStorage.getItem(
+            `payment_data_${orderId}`
+          );
+          let savedPaymentData = null;
+          try {
+            if (savedPaymentDataStr) {
+              savedPaymentData = JSON.parse(savedPaymentDataStr);
+            }
+          } catch (e) {
+            console.warn("Failed to parse saved payment data for display");
+          }
+
           setPaymentInfo({
             orderId,
             paymentKey,
             amount,
             ...result,
             reservationCompleted: !!reservationCompleteResult,
+            // Add additional payment info from saved data
+            usedPoints: savedPaymentData?.usedPoints || 0,
+            discountAmount: savedPaymentData?.discountAmount || 0,
+            originalAmount: savedPaymentData?.originalAmount || amount,
           });
         } catch (confirmError) {
           console.error("Payment confirmation failed:", confirmError);
@@ -398,6 +415,31 @@ const PaymentSuccessPage = () => {
             <span>결제금액</span>
             <span>{paymentInfo.amount?.toLocaleString()}원</span>
           </InfoRow>
+          {paymentInfo.usedPoints > 0 && (
+            <InfoRow>
+              <span>사용 포인트</span>
+              <span style={{ color: "#28a745" }}>
+                {paymentInfo.usedPoints?.toLocaleString()}P
+              </span>
+            </InfoRow>
+          )}
+          {paymentInfo.discountAmount > 0 && (
+            <InfoRow>
+              <span>할인 금액</span>
+              <span style={{ color: "#fd7e14" }}>
+                -{paymentInfo.discountAmount?.toLocaleString()}원
+              </span>
+            </InfoRow>
+          )}
+          {paymentInfo.originalAmount &&
+            paymentInfo.originalAmount !== paymentInfo.amount && (
+              <InfoRow>
+                <span>원래 금액</span>
+                <span style={{ fontSize: "0.9em", color: "#6c757d" }}>
+                  {paymentInfo.originalAmount?.toLocaleString()}원
+                </span>
+              </InfoRow>
+            )}
         </PaymentInfo>
       )}
 

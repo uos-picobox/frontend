@@ -1246,6 +1246,25 @@ const BookingPage = () => {
       return;
     }
 
+    // 결제 유효성 검증
+    if (!paymentData.isValidPayment) {
+      alert("결제 금액이 유효하지 않습니다. 포인트 사용량을 조정해주세요.");
+      return;
+    }
+
+    // 포인트 사용량 검증
+    if (paymentData.usePoints > 0) {
+      if (paymentData.usePoints > paymentData.availablePoints) {
+        alert("사용 가능한 포인트를 초과했습니다.");
+        return;
+      }
+
+      if (paymentData.usePoints > paymentData.maxUsablePoints) {
+        alert("최대 사용 가능한 포인트를 초과했습니다.");
+        return;
+      }
+    }
+
     if (paymentData.finalAmount <= 0) {
       // Free booking (no payment required)
       await handleFreeBooking();
@@ -1253,7 +1272,7 @@ const BookingPage = () => {
     }
 
     if (paymentData.finalAmount < 100) {
-      alert("결제 최소 금액은 100원입니다.");
+      alert("결제 최소 금액은 100원입니다. 포인트 사용량을 조정해주세요.");
       return;
     }
 
@@ -1264,6 +1283,15 @@ const BookingPage = () => {
   const handleFreeBooking = async () => {
     try {
       setIsProcessingPayment(true);
+
+      console.log(
+        "🆓 무료 예매 시작 - 사용된 포인트:",
+        paymentData.usePoints,
+        "원래 금액:",
+        paymentData.originalAmount,
+        "할인 금액:",
+        paymentData.discountAmount
+      );
 
       // Prepare seat IDs
       const seatIds = selectedSeats.map((seatIdentifier) => {
@@ -1308,8 +1336,13 @@ const BookingPage = () => {
         status: "COMPLETED", // 무료 예매는 바로 완료
       };
 
+      const successMessage =
+        paymentData.usePoints > 0
+          ? `예매가 완료되었습니다! (${paymentData.usePoints.toLocaleString()}P 사용)\n`
+          : `예매가 완료되었습니다! (무료 예매)\n`;
+
       alert(
-        `예매가 완료되었습니다! (무료 예매)\n` +
+        successMessage +
           `예매 ID: ${reservation.reservationId}\n` +
           `${movieDetails.title} / ${formatDate(selectedDate)} ${
             selectedScreening?.screeningStartTime
@@ -1441,12 +1474,31 @@ const BookingPage = () => {
         "💰 결제 정보 저장 - Reservation ID:",
         reservationId,
         "Final Amount:",
-        paymentData.finalAmount
+        paymentData.finalAmount,
+        "Used Points:",
+        paymentData.usePoints,
+        "Available Points:",
+        paymentData.availablePoints
       );
 
       // Validate payment data before sending
       if (paymentBeforeData.finalAmount <= 0) {
         throw new Error("유효하지 않은 결제 금액입니다.");
+      }
+
+      // Validate point usage
+      if (paymentBeforeData.usedPointAmount > 0) {
+        console.log(
+          "🔍 포인트 사용량 검증:",
+          "사용할 포인트:",
+          paymentBeforeData.usedPointAmount,
+          "사용 가능한 포인트:",
+          paymentData.availablePoints
+        );
+
+        if (paymentBeforeData.usedPointAmount > paymentData.availablePoints) {
+          throw new Error("사용 가능한 포인트를 초과했습니다.");
+        }
       }
 
       console.log("Saving payment before data:", paymentBeforeData);
@@ -1475,6 +1527,10 @@ const BookingPage = () => {
           paymentId: paymentId,
           orderId: orderId,
           amount: paymentData.finalAmount,
+          originalAmount: paymentData.originalAmount,
+          discountAmount: paymentData.discountAmount,
+          usedPoints: paymentData.usePoints,
+          selectedDiscount: paymentData.selectedDiscount,
         })
       );
 
@@ -1803,10 +1859,10 @@ const BookingPage = () => {
                   ?.map((tt) => {
                     const ticketTypeId = tt.ticketTypeId;
                     const count = ticketCounts[ticketTypeId];
-                    return count > 0 ? ` ${tt.typeName} ${count}명` : "";
+                    return count > 0 ? `${tt.typeName} ${count}명` : "";
                   })
-                  .join(", ")
-                  .trim() || "선택 안함"}
+                  .filter((item) => item !== "") // 빈 문자열 제거
+                  .join(", ") || "선택 안함"}
               </p>
               <p>
                 <strong>선택 좌석:</strong> {selectedSeats.join(", ")}
