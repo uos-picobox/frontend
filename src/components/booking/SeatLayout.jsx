@@ -188,7 +188,7 @@ const SeatLayout = ({
           선택 가능
         </LegendItem>
         <LegendItem>
-          <LegendColorBox color={({ theme }) => theme.colors.primary} /> 선택
+          <LegendColorBox color={({ theme }) => theme.colors.primary} /> 선택한
           좌석
         </LegendItem>
         <LegendItem>

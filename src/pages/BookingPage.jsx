@@ -1024,18 +1024,67 @@ const BookingPage = () => {
       } catch (error) {
         console.error("Failed to hold new seats:", error);
 
-        // Handle specific 409 error
+        // Handle specific 409 error (seat already taken by another user)
         if (
           error.message?.includes("이미 선택된 좌석") ||
-          error.status === 409
+          error.status === 409 ||
+          error.response?.status === 409
         ) {
-          console.warn("Some seats are already held, trying to continue...");
-          // 이미 선점된 좌석이라도 로컬 상태에는 추가 (UI 일관성 위해)
-          heldSeatsRef.current = [
-            ...new Set([...heldSeatsRef.current, ...seatsToHold]),
-          ];
+          console.warn("Some seats are already held by another user");
+
+          // 실패한 좌석들을 찾아서 선택 해제
+          const failedSeatNumbers = seatsToHold.map((seatId) => {
+            const seat = screeningSeatsData?.seats?.find(
+              (s) => s.seatId === seatId
+            );
+            return seat ? seat.seatNumber : seatId;
+          });
+
+          // 선택된 좌석에서 실패한 좌석들 제거
+          setSelectedSeats((prevSeats) =>
+            prevSeats.filter(
+              (seatNumber) => !failedSeatNumbers.includes(seatNumber)
+            )
+          );
+
+          // 사용자에게 명확한 알림 메시지 표시
+          const seatNumbersText = failedSeatNumbers.join(", ");
+          alert(
+            `⚠️ 좌석 선택 실패\n\n` +
+              `선택하신 좌석 ${seatNumbersText}은(는) 다른 고객님이 먼저 선택하셨습니다.\n` +
+              `다른 좌석을 선택해 주세요.\n\n` +
+              `좌석 상태를 새로고침합니다.`
+          );
+
+          // 좌석 상태 새로고침 (다른 사용자의 선택을 반영)
+          setTimeout(async () => {
+            if (selectedScreening?.screeningId) {
+              try {
+                const updatedSeatData =
+                  await screeningService.getScreeningSeats(
+                    selectedScreening.screeningId
+                  );
+                setScreeningSeatsData(updatedSeatData);
+                console.log("🔄 좌석 상태 새로고침 완료");
+              } catch (refreshError) {
+                console.warn("좌석 상태 새로고침 실패:", refreshError);
+              }
+            }
+          }, 500); // 0.5초 후 새로고침으로 사용자가 알림을 읽을 시간 제공
         } else {
-          alert("좌석 선점에 실패했습니다. 다시 시도해주세요.");
+          // 기타 오류의 경우
+          console.error("Hold seats error details:", {
+            message: error.message,
+            status: error.status,
+            response: error.response,
+            data: error.response?.data,
+          });
+
+          alert(
+            `좌석 선점에 실패했습니다.\n오류: ${
+              error.message || "알 수 없는 오류"
+            }\n다시 시도해주세요.`
+          );
         }
       }
     },
@@ -1055,7 +1104,6 @@ const BookingPage = () => {
           screeningId: selectedScreening.screeningId,
           seatIds: uniqueSeatIds,
         });
-
         // Remove released seats from held seats list
         heldSeatsRef.current = heldSeatsRef.current.filter(
           (id) => !uniqueSeatIds.includes(id)
